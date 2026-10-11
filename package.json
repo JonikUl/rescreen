@@ -1,0 +1,27 @@
+{
+  "name": "rescreen",
+  "version": "0.1.0",
+  "description": "CLI для визуального регрессионного тестирования: Snapshot'ы страниц, сравнение с Baseline'ами, самодостаточный HTML Report",
+  "license": "MIT",
+  "bin": {
+    "rescreen": "./dist/cli.mjs"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "scripts": {
+    "check": "vp check",
+    "test": "vp test run",
+    "build": "vp pack"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "typescript": "^7.0.2",
+    "vite-plus": "^1.1.0"
+  },
+  "engines": {
+    "node": ">=22.18"
+  },
+  "packageManager": "pnpm@11.5.1"
+}
