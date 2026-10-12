@@ -8,6 +8,12 @@ import type { DiffEngine, DiffResult } from "./types.js";
  * DiffEngine поверх pixelmatch: попиксельное сравнение двух PNG.
  * Идентичные изображения дают `ratio === 0` и `diffPng === null`;
  * разные размеры — {@link DimensionMismatchError}.
+ *
+ * Чувствительность: pixelmatch запускается с `threshold: 0` (максимальная —
+ * оттенок 1/255 уже считается расхождением), чтобы единственной ручкой
+ * чувствительности оставался Threshold из конфига (доля пикселей).
+ * Обработка антиалиасинга — по умолчанию (AA-пиксели не считаются расхождением):
+ * это антифлейк, соответствующий целям стабилизации.
  */
 export function createPixelmatchDiffEngine(): DiffEngine {
   return {
@@ -24,7 +30,9 @@ export function createPixelmatchDiffEngine(): DiffEngine {
 
       const { width, height } = baseline;
       const diff = new PNG({ width, height });
-      const diffPixels = pixelmatch(baseline.data, current.data, diff.data, width, height);
+      const diffPixels = pixelmatch(baseline.data, current.data, diff.data, width, height, {
+        threshold: 0,
+      });
       const totalPixels = width * height;
 
       return {

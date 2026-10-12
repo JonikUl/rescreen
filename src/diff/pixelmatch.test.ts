@@ -52,6 +52,16 @@ describe("DiffEngine (pixelmatch)", () => {
     await expect(engine.compare(baseline, current)).rejects.toThrow(DimensionMismatchError);
   });
 
+  it("чувствительность максимальна: оттенок 1/255 уже считается расхождением", async () => {
+    const baseline = encodePng(createPng(4, 4, { r: 10, g: 10, b: 10 }));
+    const current = encodePng(createPng(4, 4, { r: 11, g: 10, b: 10 }));
+
+    const result = await engine.compare(baseline, current);
+
+    expect(result.diffPixels).toBe(16);
+    expect(result.ratio).toBe(1);
+  });
+
   it("инвариант чистоты: повторный вызов с теми же байтами даёт тот же ratio", async () => {
     const baseline = encodePng(createPng(8, 6, { r: 1, g: 2, b: 3 }));
     const current = encodePng(
