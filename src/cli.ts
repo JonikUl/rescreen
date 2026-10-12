@@ -15,11 +15,12 @@ import type { RunResult, SnapshotResult } from "./runner/types.js";
 const USAGE = `rescreen — визуальное регрессионное тестирование
 
 Использование:
-  rescreen run            снять Snapshot'ы всех Page и сравнить с Baseline'ами
+  rescreen run [page...]  снять Snapshot'ы и сравнить с Baseline'ами
+                          (без аргументов — все Page из конфига)
 
 Команды init, approve, open появятся в следующих тикетах.`;
 
-async function run(): Promise<number> {
+async function run(pageNames: readonly string[]): Promise<number> {
   let capture: Capture | null = null;
   try {
     const config = await loadConfig(process.cwd());
@@ -35,7 +36,7 @@ async function run(): Promise<number> {
       reporter: createHtmlReporter(reportPath, { storage }),
     });
 
-    const result = await runner.run();
+    const result = await runner.run(pageNames);
     printSummary(result, reportPath);
     return toExitCode(result);
   } catch (err) {
@@ -91,13 +92,7 @@ async function main(): Promise<number> {
     return 0;
   }
   if (command === "run") {
-    if (rest.length > 0) {
-      console.error(
-        "rescreen run: выбор страниц пока не поддерживается — фильтрация появится в следующих тикетах.",
-      );
-      return 2;
-    }
-    return run();
+    return run(rest);
   }
   if (command === "init" || command === "approve" || command === "open") {
     console.error(`rescreen ${command}: команда появится в следующих тикетах.`);

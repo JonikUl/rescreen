@@ -10,7 +10,7 @@ import { resolveConfig } from "../config/loader.js";
 import { createPixelmatchDiffEngine } from "../diff/pixelmatch.js";
 import { createFileStorage } from "../storage/file.js";
 import { createHtmlReporter } from "../report/html.js";
-import { createPng, encodePng } from "../test-utils/png.js";
+import { createPng, encodePng, fillRect } from "../test-utils/png.js";
 import type { Capture, CaptureTarget } from "../capture/types.js";
 import type { Snapshot } from "../snapshot/types.js";
 import type { RunResult } from "./types.js";
@@ -242,5 +242,132 @@ describe("Runner (конвейер Run'а через фейковый Capture)",
     const { runner } = await makeRunner(capture);
 
     await expect(runner.run(["unknown"])).rejects.toThrow(/unknown/);
+  });
+});
+
+describe("Runner: настройки прогона (ticket 04)", () => {
+  let root: string;
+  let storageDir: string;
+  let reportPath: string;
+
+  beforeEach(async () => {
+    root = await mkdtemp(join(tmpdir(), "rescreen-runner-settings-"));
+    storageDir = join(root, ".rescreen");
+    reportPath = join(root, "report.html");
+  });
+
+  afterEach(async () => {
+    await rm(root, { recursive: true, force: true });
+  });
+
+  async function makeRunnerWith(config: Parameters<typeof resolveConfig>[0], capture: FakeCapture) {
+    const storage = createFileStorage(storageDir);
+    const reporter = createHtmlReporter(reportPath, { storage });
+    const runner = createRunner({
+      config: resolveConfig(config),
+      capture,
+      diffEngine: createPixelmatchDiffEngine(),
+      storage,
+      reporter,
+    });
+    return { runner, storage };
+  }
+
+  it("порог per-page: расхождение ниже Threshold — unchanged, выше — diff", async () => {
+    const shots = fixtures(["home", solid(0, 0, 0)]);
+    const capture = new FakeCapture(shots);
+    const { runner } = await makeRunnerWith(
+      {
+        baseUrl: "https://example.com",
+        pages: [{ name: "home", path: "/", threshold: 0.01 }],
+      },
+      capture,
+    );
+    await runner.run();
+
+    // 1 пиксель из 400 (0.25%) ниже порога 1%
+    shots.set(
+      "home",
+      encodePng(
+        fillRect(createPng(20, 20, { r: 0, g: 0, b: 0 }), 0, 0, 1, 1, { r: 255, g: 255, b: 255 }),
+      ),
+    );
+    const below = await runner.run();
+    expect(below.results[0]?.status).toBe("unchanged");
+
+    shots.set("home", solid(255, 255, 255)); // 100% выше порога
+    const above = await runner.run();
+    expect(above.results[0]?.status).toBe("diff");
+  });
+
+  it("глобальный порог применяется, когда per-page не задан", async () => {
+    const shots = fixtures(["home", solid(0, 0, 0)]);
+    const capture = new FakeCapture(shots);
+    const { runner } = await makeRunnerWith(
+      {
+        baseUrl: "https://example.com",
+        threshold: 0.5,
+        pages: [{ name: "home", path: "/" }],
+      },
+      capture,
+    );
+    await runner.run();
+
+    // 4/400 = 1% < 50%
+    shots.set(
+      "home",
+      encodePng(
+        fillRect(createPng(20, 20, { r: 0, g: 0, b: 0 }), 0, 0, 2, 2, { r: 255, g: 255, b: 255 }),
+      ),
+    );
+    const result = await runner.run();
+    expect(result.results[0]?.status).toBe("unchanged");
+  });
+
+  it("viewport per-page попадает в ключ Baseline'а", async () => {
+    const capture = new FakeCapture(fixtures(["home", solid(1, 2, 3)]));
+    const { runner, storage } = await makeRunnerWith(
+      {
+        baseUrl: "https://example.com",
+        pages: [{ name: "home", path: "/", viewport: { width: 800, height: 600 } }],
+      },
+      capture,
+    );
+    await runner.run();
+
+    expect(capture.targets[0]?.key.viewport).toEqual({ width: 800, height: 600 });
+    expect(
+      await storage.getBaseline({ page: "home", viewport: { width: 800, height: 600 } }),
+    ).not.toBeNull();
+    expect(
+      await storage.getBaseline({ page: "home", viewport: { width: 1440, height: 900 } }),
+    ).toBeNull();
+  });
+
+  it("run [page...] обрабатывает только указанные Page, резюме считает только их", async () => {
+    const capture = new FakeCapture(
+      fixtures(["home", solid(255, 0, 0)], ["about", solid(0, 255, 0)]),
+    );
+    const { runner, storage } = await makeRunnerWith(
+      {
+        baseUrl: "https://example.com",
+        pages: [
+          { name: "home", path: "/" },
+          { name: "about", path: "/about" },
+        ],
+      },
+      capture,
+    );
+
+    const result = await runner.run(["about"]);
+
+    expect(result.results).toHaveLength(1);
+    expect(result.results[0]?.key.page).toBe("about");
+    expect(result.summary.total).toBe(1);
+    expect(capture.targets.map((t) => t.key.page)).toEqual(["about"]);
+    // home не снималась и Baseline под неё не создан
+    expect(
+      await storage.getBaseline({ page: "home", viewport: { width: 1440, height: 900 } }),
+    ).toBeNull();
   });
 });
