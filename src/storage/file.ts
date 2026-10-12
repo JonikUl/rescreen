@@ -1,7 +1,8 @@
+import { createHash } from "node:crypto";
 import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
-import type { BaselineStorage } from "./types.js";
+import type { AuditEntry, BaselineStorage } from "./types.js";
 import type { Snapshot, SnapshotKey } from "../snapshot/types.js";
 import type { RunResult } from "../runner/types.js";
 
@@ -100,11 +101,12 @@ export function createFileStorage(rootDir?: string): FileBaselineStorage {
         return existing; // идемпотентно: Baseline уже равен текущему снимку
       }
       await saveSnapshot(dirBaselines, current);
-      const entry = {
+      const entry: AuditEntry = {
         at: new Date().toISOString(),
         page: key.page,
         viewport: key.viewport,
         ...(key.element === undefined ? {} : { element: key.element }),
+        sha256: createHash("sha256").update(current.png).digest("hex"),
       };
       await mkdir(root, { recursive: true });
       await appendFile(join(root, "audit.jsonl"), `${JSON.stringify(entry)}\n`);

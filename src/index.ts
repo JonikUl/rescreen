@@ -19,9 +19,12 @@ export {
 export { DimensionMismatchError } from "./diff/types.js";
 export type { DiffEngine, DiffResult } from "./diff/types.js";
 export { createPixelmatchDiffEngine } from "./diff/pixelmatch.js";
-export type { BaselineStorage } from "./storage/types.js";
+export type { AuditEntry, BaselineStorage } from "./storage/types.js";
 export { createFileStorage } from "./storage/file.js";
 export type { FileBaselineStorage } from "./storage/file.js";
+export type { Approver, ApproveResult } from "./approve/types.js";
+export { createApprover } from "./approve/approve.js";
+export type { ApproverDeps } from "./approve/approve.js";
 export type {
   Runner,
   RunResult,

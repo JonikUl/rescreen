@@ -9,16 +9,21 @@ import { createPixelmatchDiffEngine } from "./diff/pixelmatch.js";
 import { createFileStorage } from "./storage/file.js";
 import { createRunner } from "./runner/runner.js";
 import { toExitCode } from "./runner/exit-code.js";
+import { createApprover } from "./approve/approve.js";
 import { createHtmlReporter } from "./report/html.js";
 import type { RunResult, SnapshotResult } from "./runner/types.js";
+import type { SnapshotKey } from "./snapshot/types.js";
 
 const USAGE = `rescreen — визуальное регрессионное тестирование
 
 Использование:
-  rescreen run [page...]  снять Snapshot'ы и сравнить с Baseline'ами
-                          (без аргументов — все Page из конфига)
+  rescreen run [page...]      снять Snapshot'ы и сравнить с Baseline'ами
+                              (без аргументов — все Page из конфига)
+  rescreen approve [page...]  подтвердить Diff'ы последнего прогона:
+                              текущие Snapshot'ы становятся Baseline'ами
+                              (без аргументов — все Page с Diff'ами)
 
-Команды init, approve, open появятся в следующих тикетах.`;
+Команды init, open появятся в следующих тикетах.`;
 
 async function run(pageNames: readonly string[]): Promise<number> {
   let capture: Capture | null = null;
@@ -53,6 +58,34 @@ async function run(pageNames: readonly string[]): Promise<number> {
   }
 }
 
+function describeKey(key: SnapshotKey): string {
+  return `${key.page} (${key.viewport.width}×${key.viewport.height}${key.element === undefined ? "" : ` :: ${key.element}`})`;
+}
+
+async function approve(pageNames: readonly string[]): Promise<number> {
+  try {
+    const storage = createFileStorage();
+    const approver = createApprover({ storage });
+    const result = await approver.approve(pageNames);
+
+    if (result.approved.length === 0) {
+      console.log("rescreen: нечего аппрувить — неподтверждённых изменений нет.");
+      return 0;
+    }
+    const pages = new Set(result.approved.map((s) => s.key.page)).size;
+    console.log(
+      `rescreen: подтверждено снимков: ${result.approved.length} (страниц: ${pages}) — они стали новыми Baseline'ами`,
+    );
+    for (const s of result.approved) {
+      console.log(`  ${describeKey(s.key)}`);
+    }
+    return 0;
+  } catch (err) {
+    console.error(`Ошибка: ${err instanceof Error ? err.message : String(err)}`);
+    return 2;
+  }
+}
+
 function printSummary(result: RunResult, reportPath: string): void {
   const s = result.summary;
   console.log("rescreen: прогон завершён");
@@ -69,8 +102,7 @@ function printSummary(result: RunResult, reportPath: string): void {
 }
 
 function describeResult(result: SnapshotResult): string {
-  const key = result.key;
-  const title = `${key.page} (${key.viewport.width}×${key.viewport.height}${key.element === undefined ? "" : ` :: ${key.element}`})`;
+  const title = describeKey(result.key);
   switch (result.status) {
     case "unchanged":
       return `${title} — без изменений`;
@@ -104,7 +136,10 @@ async function main(): Promise<number> {
   if (command === "run") {
     return run(rest);
   }
-  if (command === "init" || command === "approve" || command === "open") {
+  if (command === "approve") {
+    return approve(rest);
+  }
+  if (command === "init" || command === "open") {
     console.error(`rescreen ${command}: команда появится в следующих тикетах.`);
     return 2;
   }

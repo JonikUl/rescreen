@@ -1,5 +1,27 @@
 import type { Snapshot, SnapshotKey } from "../snapshot/types.js";
 import type { RunResult } from "../runner/types.js";
+import type { Viewport } from "../config/types.js";
+
+/**
+ * Запись Audit Log'а (JSONL, одна строка на Approve одного Snapshot'а).
+ *
+ * Формат зафиксирован (spec, story 25 — «что, когда, какой Snapshot стал Baseline'ом»):
+ * - `at` — момент Approve (ISO 8601, UTC);
+ * - `page`, `viewport`, `element?` — ключ Snapshot'а (`element` присутствует только
+ *   у элементных Snapshot'ов);
+ * - `sha256` — hex-хеш содержимого PNG, ставшего Baseline'ом: идентичность Snapshot'а,
+ *   по которой запись можно сопоставить с файлом в `baselines/`.
+ *
+ * Инвариант: записи только добавляются (append-only), одна операция Approve одного
+ * Snapshot'а — ровно одна запись.
+ */
+export interface AuditEntry {
+  readonly at: string;
+  readonly page: string;
+  readonly viewport: Viewport;
+  readonly element?: string;
+  readonly sha256: string;
+}
 
 /**
  * BaselineStorage — хранилище Snapshot'ов и результатов Run'ов.
@@ -35,7 +57,8 @@ export interface BaselineStorage {
 
   /**
    * Approve: текущий Snapshot по ключу становится новым Baseline'ом,
-   * в Audit Log (JSONL) добавляется запись (что, когда, какой Snapshot → Baseline).
+   * в Audit Log (JSONL) добавляется запись {@link AuditEntry}
+   * (что, когда, sha256 Snapshot'а, ставшего Baseline'ом).
    *
    * Предусловие: по ключу существует текущий Snapshot (был Run).
    * Постусловие: `getBaseline(key)` побайтово равен текущему Snapshot'у на момент вызова;

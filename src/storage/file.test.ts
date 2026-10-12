@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -89,6 +90,9 @@ describe("BaselineStorage (файловая реализация)", () => {
     expect(entry.element).toBe(".hero");
     expect(entry.viewport).toEqual({ width: 1440, height: 900 });
     expect(typeof entry.at).toBe("string");
+    // sha256 — идентичность Snapshot'а, ставшего Baseline'ом (spec, story 25)
+    expect(entry.sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(entry.sha256).toBe(createHash("sha256").update(current.png).digest("hex"));
   });
 
   it("approve идемпотентен: повторный вызов без нового Run не меняет Baseline и не пишет в аудит", async () => {
