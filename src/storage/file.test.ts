@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
+import fc from "fast-check";
 
 import { createFileStorage } from "./file.js";
 import { createPng, encodePng, makeSnapshot } from "../test-utils/png.js";
@@ -207,5 +208,36 @@ describe("BaselineStorage (файловая реализация)", () => {
     const loaded = await storage.getBaseline(key());
     expect(loaded).not.toBeNull();
     expect(loaded?.masksApplied).toEqual([]);
+  });
+
+  it("property: round-trip для любых допустимых ключей (fast-check)", async () => {
+    const storage = createFileStorage(root);
+    // page — slug (см. предусловие SnapshotKey); element — произвольная строка
+    const slug = fc.string({
+      unit: fc.constantFrom(
+        ..."abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_".split(""),
+      ),
+      minLength: 1,
+      maxLength: 24,
+    });
+    const arbitraryKey = fc.record({
+      page: slug,
+      viewport: fc.record({
+        width: fc.integer({ min: 1, max: 10000 }),
+        height: fc.integer({ min: 1, max: 10000 }),
+      }),
+      element: fc.option(fc.string({ unit: "grapheme", maxLength: 60 }), { nil: undefined }),
+    });
+
+    await fc.assert(
+      fc.asyncProperty(arbitraryKey, async (k) => {
+        const snapshot = makeSnapshot(k, encodePng(createPng(1, 1)));
+        await storage.saveBaseline(snapshot);
+        const loaded = await storage.getBaseline(k);
+        expect(loaded?.png).toEqual(snapshot.png);
+        expect(loaded?.key).toEqual(k);
+      }),
+      { numRuns: 30 },
+    );
   });
 });
