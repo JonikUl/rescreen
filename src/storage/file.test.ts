@@ -133,6 +133,37 @@ describe("BaselineStorage (файловая реализация)", () => {
     expect(await storage.getBaseline(key({ page: "unknown" }))).toBeNull();
   });
 
+  it("getCurrent: null до первого Run, round-trip после saveCurrent", async () => {
+    const storage = createFileStorage(root);
+    const k = key();
+    expect(await storage.getCurrent(k)).toBeNull();
+
+    const current = makeSnapshot(k, encodePng(createPng(3, 3, { r: 7, g: 8, b: 9 })), [".banner"]);
+    await storage.saveCurrent(current);
+
+    const loaded = await storage.getCurrent(k);
+    expect(loaded?.png).toEqual(current.png);
+    expect(loaded?.masksApplied).toEqual([".banner"]);
+  });
+
+  it("saveDiff → getDiff round-trip; по неизвестному ключу null; Baseline и current не трогаются", async () => {
+    const storage = createFileStorage(root);
+    const k = key();
+    expect(await storage.getDiff(k)).toBeNull();
+
+    const baseline = makeSnapshot(k, encodePng(createPng(2, 2, { r: 0, g: 0, b: 0 })));
+    const current = makeSnapshot(k, encodePng(createPng(2, 2, { r: 255, g: 255, b: 255 })));
+    const diffPng = encodePng(createPng(2, 2, { r: 255, g: 0, b: 255 }));
+    await storage.saveBaseline(baseline);
+    await storage.saveCurrent(current);
+
+    await storage.saveDiff(k, diffPng);
+
+    expect(await storage.getDiff(k)).toEqual(diffPng);
+    expect((await storage.getBaseline(k))?.png).toEqual(baseline.png);
+    expect((await storage.getCurrent(k))?.png).toEqual(current.png);
+  });
+
   it("несуществующий файл снимка возвращает null, а не падает", async () => {
     const storage = createFileStorage(root);
     // png-файл есть, а метаданные отсутствуют — хранилище не должно падать

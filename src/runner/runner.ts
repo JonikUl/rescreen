@@ -5,7 +5,7 @@ import type { Capture, CaptureTarget } from "../capture/types.js";
 import type { RescreenConfig, ResolvedPageConfig } from "../config/types.js";
 import type { DiffEngine } from "../diff/types.js";
 import type { Reporter } from "../report/types.js";
-import type { SnapshotKey, Snapshot } from "../snapshot/types.js";
+import type { Snapshot } from "../snapshot/types.js";
 import type { BaselineStorage } from "../storage/types.js";
 import type { Runner, RunResult, SnapshotResult } from "./types.js";
 
@@ -16,18 +16,6 @@ export interface RunnerDeps {
   readonly diffEngine: DiffEngine;
   readonly storage: BaselineStorage;
   readonly reporter: Reporter;
-}
-
-/** Возможность сохранять Diff-изображения — есть у файлового хранилища, задел под git/S3. */
-interface DiffImageSink {
-  saveDiff(key: SnapshotKey, png: Uint8Array): Promise<void>;
-}
-
-function asDiffImageSink(storage: BaselineStorage): DiffImageSink | null {
-  if ("saveDiff" in storage && typeof storage.saveDiff === "function") {
-    return storage as BaselineStorage & DiffImageSink;
-  }
-  return null;
 }
 
 /**
@@ -52,7 +40,6 @@ export function createRunner(deps: RunnerDeps): Runner {
 
       const startedAt = new Date();
       const results: SnapshotResult[] = [];
-      const diffSink = asDiffImageSink(deps.storage);
 
       for (const page of pages) {
         const mask = [...resolved.mask, ...page.mask];
@@ -66,7 +53,7 @@ export function createRunner(deps: RunnerDeps): Runner {
           })),
         ];
         for (const target of targets) {
-          results.push(await processTarget(target, page, diffSink));
+          results.push(await processTarget(target, page));
         }
       }
 
@@ -93,7 +80,6 @@ export function createRunner(deps: RunnerDeps): Runner {
   async function processTarget(
     target: CaptureTarget,
     page: ResolvedPageConfig,
-    diffSink: DiffImageSink | null,
   ): Promise<SnapshotResult> {
     const key = target.key;
     try {
@@ -108,7 +94,7 @@ export function createRunner(deps: RunnerDeps): Runner {
 
       const diff = await deps.diffEngine.compare(baseline.png, snapshot.png);
       if (diff.ratio > page.threshold) {
-        if (diff.diffPng !== null) await diffSink?.saveDiff(key, diff.diffPng);
+        if (diff.diffPng !== null) await deps.storage.saveDiff(key, diff.diffPng);
         return { key, status: "diff", diffRatio: diff.ratio };
       }
       return { key, status: "unchanged", diffRatio: diff.ratio };

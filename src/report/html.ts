@@ -2,17 +2,16 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
 import { createFileStorage } from "../storage/file.js";
-import type { SnapshotContentAccess } from "../storage/file.js";
 import type { BaselineStorage } from "../storage/types.js";
 import type { RunResult, SnapshotResult } from "../runner/types.js";
 import type { Reporter } from "./types.js";
 
 export interface HtmlReporterDeps {
   /**
-   * Хранилище с доступом к текущим Snapshot'ам и Diff'ам.
+   * Хранилище с результатами Run'а (текущие Snapshot'ы, Diff'ы).
    * По умолчанию — файловое хранилище в `.rescreen` текущей директории.
    */
-  readonly storage?: BaselineStorage & SnapshotContentAccess;
+  readonly storage?: BaselineStorage;
 }
 
 const STATUS_LABELS: Record<SnapshotResult["status"], string> = {
@@ -28,7 +27,7 @@ const STATUS_LABELS: Record<SnapshotResult["status"], string> = {
  * Намеренно примитивен (дизайн — ticket 07).
  */
 export function createHtmlReporter(outputPath: string, deps: HtmlReporterDeps = {}): Reporter {
-  const storage: BaselineStorage & SnapshotContentAccess = deps.storage ?? createFileStorage();
+  const storage: BaselineStorage = deps.storage ?? createFileStorage();
 
   return {
     async render(result: RunResult): Promise<string> {
@@ -41,10 +40,7 @@ export function createHtmlReporter(outputPath: string, deps: HtmlReporterDeps = 
   };
 }
 
-async function renderDocument(
-  result: RunResult,
-  storage: BaselineStorage & SnapshotContentAccess,
-): Promise<string> {
+async function renderDocument(result: RunResult, storage: BaselineStorage): Promise<string> {
   const s = result.summary;
   const sections: string[] = [];
 
@@ -67,10 +63,7 @@ ${sections.join("\n")}
 `;
 }
 
-async function renderSection(
-  result: SnapshotResult,
-  storage: BaselineStorage & SnapshotContentAccess,
-): Promise<string> {
+async function renderSection(result: SnapshotResult, storage: BaselineStorage): Promise<string> {
   const { key } = result;
   const title = escapeHtml(
     `${key.page} (${key.viewport.width}×${key.viewport.height}${key.element === undefined ? "" : ` :: ${key.element}`})`,

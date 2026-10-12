@@ -53,6 +53,25 @@ export interface BaselineStorage {
   saveRunResult(result: RunResult): Promise<void>;
 
   /**
+   * Возвращает текущий Snapshot последнего Run'а по ключу или null.
+   * Инвариант: чистое чтение — не создаёт и не изменяет данные.
+   */
+  getCurrent(key: SnapshotKey): Promise<Snapshot | null>;
+
+  /**
+   * Возвращает Diff-изображение последнего Run'а по ключу или null.
+   * Инвариант: чистое чтение.
+   */
+  getDiff(key: SnapshotKey): Promise<Uint8Array | null>;
+
+  /**
+   * Сохраняет Diff-изображение по ключу (вызывает Runner при обнаружении Diff'а).
+   * Постусловие: `getDiff(key)` возвращает эти байты.
+   * Инвариант: не изменяет ни Baseline, ни текущий Snapshot.
+   */
+  saveDiff(key: SnapshotKey, png: Uint8Array): Promise<void>;
+
+  /**
    * Возвращает результат последнего Run'а или null, если Run'ов ещё не было.
    */
   getLastRunResult(): Promise<RunResult | null>;

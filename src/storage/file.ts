@@ -5,25 +5,11 @@ import type { BaselineStorage } from "./types.js";
 import type { Snapshot, SnapshotKey } from "../snapshot/types.js";
 import type { RunResult } from "../runner/types.js";
 
-/**
- * Доступ к текущим Snapshot'ам и Diff-изображениям — расширение поверх контракта
- * {@link BaselineStorage}, нужное Report'у (в контракте хранилища их нет).
- */
-export interface SnapshotContentAccess {
-  /** Текущий Snapshot последнего Run'а по ключу или null. */
-  getCurrent(key: SnapshotKey): Promise<Snapshot | null>;
-  /** Diff-изображение последнего Run'а по ключу или null. */
-  getDiff(key: SnapshotKey): Promise<Uint8Array | null>;
-  /** Сохраняет Diff-изображение по ключу (вызов — обязанность Runner'а). */
-  saveDiff(key: SnapshotKey, png: Uint8Array): Promise<void>;
-}
-
-/** Файловая реализация {@link BaselineStorage} плюс доступ к текущим снимкам и Diff'ам. */
-export type FileBaselineStorage = BaselineStorage &
-  SnapshotContentAccess & {
-    /** Абсолютный путь к корню хранилища (например, `<cwd>/.rescreen`). */
-    readonly rootDir: string;
-  };
+/** Файловая реализация {@link BaselineStorage}. */
+export type FileBaselineStorage = BaselineStorage & {
+  /** Абсолютный путь к корню хранилища (например, `<cwd>/.rescreen`). */
+  readonly rootDir: string;
+};
 
 interface SnapshotMeta {
   readonly capturedAt: string;

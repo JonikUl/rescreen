@@ -16,7 +16,7 @@ export type { DiffEngine, DiffResult } from "./diff/types.js";
 export { createPixelmatchDiffEngine } from "./diff/pixelmatch.js";
 export type { BaselineStorage } from "./storage/types.js";
 export { createFileStorage } from "./storage/file.js";
-export type { FileBaselineStorage, SnapshotContentAccess } from "./storage/file.js";
+export type { FileBaselineStorage } from "./storage/file.js";
 export type {
   Runner,
   RunResult,
