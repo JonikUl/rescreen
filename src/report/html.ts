@@ -18,6 +18,7 @@ const STATUS_LABELS: Record<SnapshotResult["status"], string> = {
   "new-baseline": "новый Baseline",
   unchanged: "без изменений",
   diff: "изменилось",
+  skipped: "пропущен",
   error: "ошибка",
 };
 
@@ -56,7 +57,7 @@ async function renderDocument(result: RunResult, storage: BaselineStorage): Prom
 </head>
 <body>
 <h1>rescreen — отчёт о визуальной проверке</h1>
-<p>Проверено ${s.total} страниц: без изменений ${s.unchanged}, изменилось ${s.diffs}, новых ${s.newBaselines}, ошибок ${s.errors}</p>
+<p>Проверено ${s.pages} страниц (${s.total} снимков): без изменений ${s.unchanged}, изменилось ${s.diffs}, новых ${s.newBaselines}, пропущено ${s.skipped}, ошибок ${s.errors}</p>
 ${sections.join("\n")}
 </body>
 </html>

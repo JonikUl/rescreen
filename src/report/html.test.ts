@@ -43,14 +43,24 @@ describe("Reporter (HTML)", () => {
         { key: homeKey, status: "diff", diffRatio: 0.25, masksApplied: [".cookie-banner"] },
         { key: aboutKey, status: "unchanged", diffRatio: 0, masksApplied: [] },
       ],
-      summary: { total: 2, unchanged: 1, diffs: 1, newBaselines: 0, errors: 0 },
+      summary: {
+        pages: 2,
+        total: 2,
+        unchanged: 1,
+        diffs: 1,
+        newBaselines: 0,
+        skipped: 0,
+        errors: 0,
+      },
     };
 
     const written = await createHtmlReporter(reportPath, { storage }).render(result);
 
     expect(written).toBe(reportPath);
     const html = await readFile(reportPath, "utf8");
-    expect(html).toContain("Проверено 2 страниц: без изменений 1, изменилось 1, новых 0, ошибок 0");
+    expect(html).toContain(
+      "Проверено 2 страниц (2 снимков): без изменений 1, изменилось 1, новых 0, пропущено 0, ошибок 0",
+    );
     expect(html).toContain("home");
     expect(html).toContain("about");
     expect(html).toContain("data:image/png;base64");
@@ -61,7 +71,15 @@ describe("Reporter (HTML)", () => {
     const result: RunResult = {
       startedAt: new Date(),
       results: [{ key: homeKey, status: "error", masksApplied: [], error: "Сеть недоступна" }],
-      summary: { total: 1, unchanged: 0, diffs: 0, newBaselines: 0, errors: 1 },
+      summary: {
+        pages: 1,
+        total: 1,
+        unchanged: 0,
+        diffs: 0,
+        newBaselines: 0,
+        skipped: 0,
+        errors: 1,
+      },
     };
 
     await createHtmlReporter(reportPath, { storage }).render(result);
@@ -79,7 +97,15 @@ describe("Reporter (HTML)", () => {
         { key: homeKey, status: "unchanged", diffRatio: 0, masksApplied: [".cookie", "#chat"] },
         { key: aboutKey, status: "unchanged", diffRatio: 0, masksApplied: [] },
       ],
-      summary: { total: 2, unchanged: 2, diffs: 0, newBaselines: 0, errors: 0 },
+      summary: {
+        pages: 2,
+        total: 2,
+        unchanged: 2,
+        diffs: 0,
+        newBaselines: 0,
+        skipped: 0,
+        errors: 0,
+      },
     };
 
     await createHtmlReporter(reportPath, { storage }).render(result);
@@ -104,7 +130,15 @@ describe("Reporter (HTML)", () => {
           warning: "Стабильный кадр не достигнут за 5000 мс — используется последний кадр",
         },
       ],
-      summary: { total: 1, unchanged: 1, diffs: 0, newBaselines: 0, errors: 0 },
+      summary: {
+        pages: 1,
+        total: 1,
+        unchanged: 1,
+        diffs: 0,
+        newBaselines: 0,
+        skipped: 0,
+        errors: 0,
+      },
     };
 
     await createHtmlReporter(reportPath, { storage }).render(result);

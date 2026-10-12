@@ -57,11 +57,11 @@ function printSummary(result: RunResult, reportPath: string): void {
   const s = result.summary;
   console.log("rescreen: прогон завершён");
   console.log(
-    `Проверено ${s.total} страниц: без изменений ${s.unchanged}, изменилось ${s.diffs}, новых ${s.newBaselines}, ошибок ${s.errors}`,
+    `Проверено ${s.pages} страниц (${s.total} снимков): без изменений ${s.unchanged}, изменилось ${s.diffs}, новых ${s.newBaselines}, пропущено ${s.skipped}, ошибок ${s.errors}`,
   );
   for (const r of result.results) {
     console.log(`  ${describeResult(r)}`);
-    if (r.warning !== undefined && r.status !== "error") {
+    if (r.warning !== undefined && r.status !== "error" && r.status !== "skipped") {
       console.log(`    ⚠ ${r.warning}`);
     }
   }
@@ -78,8 +78,15 @@ function describeResult(result: SnapshotResult): string {
       return `${title} — ИЗМЕНИЛОСЬ (${((result.diffRatio ?? 0) * 100).toFixed(2)}% пикселей)`;
     case "new-baseline":
       return `${title} — создан новый Baseline`;
+    case "skipped":
+      return `${title} — ПРОПУЩЕН: ${result.warning ?? "элемент не найден"}`;
     case "error":
       return `${title} — ОШИБКА: ${result.error ?? "неизвестная ошибка"}`;
+    default: {
+      // Страховка от неисчерпывающего свитча при добавлении нового статуса
+      const unknown: never = result.status;
+      throw new Error(`Неизвестный статус SnapshotResult: ${String(unknown)}`);
+    }
   }
 }
 

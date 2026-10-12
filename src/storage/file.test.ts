@@ -119,7 +119,15 @@ describe("BaselineStorage (файловая реализация)", () => {
         { key: key(), status: "unchanged", diffRatio: 0, masksApplied: [".cookie"] },
         { key: key({ page: "news" }), status: "diff", diffRatio: 0.42, masksApplied: [] },
       ],
-      summary: { total: 2, unchanged: 1, diffs: 1, newBaselines: 0, errors: 0 },
+      summary: {
+        pages: 2,
+        total: 2,
+        unchanged: 1,
+        diffs: 1,
+        newBaselines: 0,
+        skipped: 0,
+        errors: 0,
+      },
     };
     await storage.saveRunResult(result);
 

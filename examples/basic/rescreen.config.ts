@@ -10,6 +10,7 @@ export default {
       path: "/",
       // Per-page маска: живые часы меняются каждый прогон — скрываем их на своей Page
       mask: [".live-clock"],
+      elements: [".card"],
     },
     { name: "features", path: "/features.html" },
   ],

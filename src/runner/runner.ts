@@ -63,10 +63,12 @@ export function createRunner(deps: RunnerDeps): Runner {
         startedAt,
         results,
         summary: {
+          pages: new Set(results.map((r) => r.key.page)).size,
           total: results.length,
           unchanged: count("unchanged"),
           diffs: count("diff"),
           newBaselines: count("new-baseline"),
+          skipped: count("skipped"),
           errors: count("error"),
         },
       };
@@ -123,10 +125,9 @@ export function createRunner(deps: RunnerDeps): Runner {
       if (err instanceof ElementNotFoundError) {
         return {
           key,
-          status: "error",
+          status: "skipped",
           masksApplied: target.mask,
           warning: err.message,
-          error: err.message,
         };
       }
       return {
