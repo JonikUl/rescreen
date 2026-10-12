@@ -17,9 +17,16 @@ export interface SnapshotResult {
   readonly diffRatio?: number;
   /**
    * Нефатальное предупреждение: селектор Element'а не найден, стабильный кадр
-   * не дождались за таймаут и т.п.
+   * не дождались за таймаут и т.п. При нескольких предупреждениях Snapshot'а
+   * они склеены через "; ".
    */
   readonly warning?: string;
+  /**
+   * Mask'и, применённые при снятии (глобальные + per-page, в порядке применения);
+   * на успешных снимках совпадает с `Snapshot.masksApplied`. При статусе `error`
+   * — маски, запрошенные для цели (снимок не получен).
+   */
+  readonly masksApplied: readonly string[];
   /** Описание ошибки при статусе `error` (человекочитаемое, на русском). */
   readonly error?: string;
 }

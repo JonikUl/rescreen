@@ -15,10 +15,11 @@ import type { Capture, CaptureTarget } from "../capture/types.js";
 import type { Snapshot } from "../snapshot/types.js";
 import type { RunResult } from "./types.js";
 
-/** Фейковый Capture: отдаёт PNG-фикстуры, умеет «падать» для заданных Page. */
+/** Фейковый Capture: отдаёт PNG-фикстуры, умеет «падать» и «предупреждать» для заданных Page. */
 class FakeCapture implements Capture {
   readonly targets: CaptureTarget[] = [];
   failures = new Map<string, Error>();
+  warnings = new Map<string, readonly string[]>();
 
   constructor(private fixtures: Map<string, Uint8Array>) {}
 
@@ -28,7 +29,13 @@ class FakeCapture implements Capture {
     if (failure) throw failure;
     const png = this.fixtures.get(target.key.page);
     if (!png) throw new Error(`Нет фикстуры для Page "${target.key.page}"`);
-    return { key: target.key, png, capturedAt: new Date(), masksApplied: target.mask };
+    return {
+      key: target.key,
+      png,
+      capturedAt: new Date(),
+      masksApplied: target.mask,
+      warnings: this.warnings.get(target.key.page) ?? [],
+    };
   }
 
   async dispose(): Promise<void> {}
@@ -369,5 +376,95 @@ describe("Runner: настройки прогона (ticket 04)", () => {
     expect(
       await storage.getBaseline({ page: "home", viewport: { width: 1440, height: 900 } }),
     ).toBeNull();
+  });
+});
+
+describe("Runner: предупреждения и Mask'и (ticket 03)", () => {
+  let root: string;
+  let storageDir: string;
+  let reportPath: string;
+
+  beforeEach(async () => {
+    root = await mkdtemp(join(tmpdir(), "rescreen-runner-warnings-"));
+    storageDir = join(root, ".rescreen");
+    reportPath = join(root, "report.html");
+  });
+
+  afterEach(async () => {
+    await rm(root, { recursive: true, force: true });
+  });
+
+  async function makeRunner(capture: FakeCapture) {
+    const storage = createFileStorage(storageDir);
+    const reporter = createHtmlReporter(reportPath, { storage });
+    const runner = createRunner({
+      config,
+      capture,
+      diffEngine: createPixelmatchDiffEngine(),
+      storage,
+      reporter,
+    });
+    return { runner };
+  }
+
+  it("предупреждение Capture попадает в SnapshotResult.warning и не меняет статус", async () => {
+    const capture = new FakeCapture(
+      fixtures(["home", solid(255, 0, 0)], ["about", solid(0, 255, 0)]),
+    );
+    capture.warnings.set("home", [
+      "Стабильный кадр не достигнут за 5000 мс — используется последний кадр",
+    ]);
+    const { runner } = await makeRunner(capture);
+
+    const result = await runner.run();
+
+    const home = result.results.find((r) => r.key.page === "home");
+    expect(home?.status).toBe("new-baseline");
+    expect(home?.warning).toBe(
+      "Стабильный кадр не достигнут за 5000 мс — используется последний кадр",
+    );
+    const s = result.summary;
+    expect(s.total).toBe(s.unchanged + s.diffs + s.newBaselines + s.errors);
+    expect(toExitCode(result)).toBe(0);
+  });
+
+  it('несколько предупреждений Snapshot\'а склеиваются в SnapshotResult.warning через "; "', async () => {
+    const capture = new FakeCapture(
+      fixtures(["home", solid(255, 0, 0)], ["about", solid(0, 255, 0)]),
+    );
+    capture.warnings.set("home", ["Первое предупреждение", "Второе предупреждение"]);
+    const { runner } = await makeRunner(capture);
+
+    const result = await runner.run();
+
+    expect(result.results[0]?.warning).toBe("Первое предупреждение; Второе предупреждение");
+  });
+
+  it("masksApplied Snapshot'а попадает в SnapshotResult (глобальные + per-page)", async () => {
+    const capture = new FakeCapture(
+      fixtures(["home", solid(255, 0, 0)], ["about", solid(0, 255, 0)]),
+    );
+    const { runner } = await makeRunner(capture);
+
+    const result = await runner.run();
+
+    const home = result.results.find((r) => r.key.page === "home");
+    const about = result.results.find((r) => r.key.page === "about");
+    expect(home?.masksApplied).toEqual([".cookie-banner"]);
+    expect(about?.masksApplied).toEqual([".cookie-banner", "#consultant-widget"]);
+  });
+
+  it("при ошибке съёмки masksApplied — маски, запрошенные для цели", async () => {
+    const capture = new FakeCapture(
+      fixtures(["home", solid(255, 0, 0)], ["about", solid(0, 255, 0)]),
+    );
+    capture.failures.set("home", new Error("Сервер недоступен"));
+    const { runner } = await makeRunner(capture);
+
+    const result = await runner.run();
+
+    const home = result.results.find((r) => r.key.page === "home");
+    expect(home?.status).toBe("error");
+    expect(home?.masksApplied).toEqual([".cookie-banner"]);
   });
 });

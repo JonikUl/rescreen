@@ -10,7 +10,12 @@ export { loadConfig, resolveConfig } from "./config/loader.js";
 export type { Snapshot, SnapshotKey } from "./snapshot/types.js";
 export { ElementNotFoundError } from "./capture/types.js";
 export type { Capture, CaptureTarget } from "./capture/types.js";
-export { createPlaywrightCapture } from "./capture/playwright.js";
+export {
+  createPlaywrightCapture,
+  FRAME_STABILITY_INTERVAL_MS,
+  FRAME_STABILITY_PROBES,
+  FRAME_STABILITY_TIMEOUT_MS,
+} from "./capture/playwright.js";
 export { DimensionMismatchError } from "./diff/types.js";
 export type { DiffEngine, DiffResult } from "./diff/types.js";
 export { createPixelmatchDiffEngine } from "./diff/pixelmatch.js";

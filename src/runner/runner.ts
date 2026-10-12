@@ -86,26 +86,55 @@ export function createRunner(deps: RunnerDeps): Runner {
       const snapshot: Snapshot = await deps.capture.capture(target);
       await deps.storage.saveCurrent(snapshot);
 
+      const warning = snapshot.warnings.length > 0 ? snapshot.warnings.join("; ") : undefined;
       const baseline = await deps.storage.getBaseline(key);
       if (!baseline) {
         await deps.storage.saveBaseline(snapshot);
-        return { key, status: "new-baseline" };
+        return { key, status: "new-baseline", masksApplied: snapshot.masksApplied, warning };
       }
 
       const diff = await deps.diffEngine.compare(baseline.png, snapshot.png);
       if (diff.ratio > page.threshold) {
         if (diff.diffPng !== null) await deps.storage.saveDiff(key, diff.diffPng);
-        return { key, status: "diff", diffRatio: diff.ratio };
+        return {
+          key,
+          status: "diff",
+          diffRatio: diff.ratio,
+          masksApplied: snapshot.masksApplied,
+          warning,
+        };
       }
-      return { key, status: "unchanged", diffRatio: diff.ratio };
+      return {
+        key,
+        status: "unchanged",
+        diffRatio: diff.ratio,
+        masksApplied: snapshot.masksApplied,
+        warning,
+      };
     } catch (err) {
       if (err instanceof DimensionMismatchError) {
-        return { key, status: "error", error: `${err.message} (доработка поведения — позже)` };
+        return {
+          key,
+          status: "error",
+          masksApplied: target.mask,
+          error: `${err.message} (доработка поведения — позже)`,
+        };
       }
       if (err instanceof ElementNotFoundError) {
-        return { key, status: "error", warning: err.message, error: err.message };
+        return {
+          key,
+          status: "error",
+          masksApplied: target.mask,
+          warning: err.message,
+          error: err.message,
+        };
       }
-      return { key, status: "error", error: err instanceof Error ? err.message : String(err) };
+      return {
+        key,
+        status: "error",
+        masksApplied: target.mask,
+        error: err instanceof Error ? err.message : String(err),
+      };
     }
   }
 }

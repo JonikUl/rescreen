@@ -55,6 +55,34 @@
           transform: translateY(0);
         }
       }
+      .slider {
+        width: 320px;
+        margin-top: 24px;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .slide {
+        height: 80px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #f5f5f5;
+      }
+      .slide[hidden] {
+        display: none;
+      }
+      .live-clock {
+        width: 320px;
+        height: 48px;
+        margin-top: 24px;
+        display: flex;
+        align-items: center;
+        padding: 0 16px;
+        background: #eef3ff;
+        border-radius: 8px;
+        font-variant-numeric: tabular-nums;
+      }
     </style>
   </head>
   <body>
@@ -63,6 +91,35 @@
       <p>Тестовая страница для tracer bullet'а rescreen. Текст и вёрстка статичны.</p>
     </div>
     <div class="pulse"></div>
+    <div class="slider">
+      <div class="slide">Слайд 1</div>
+      <div class="slide" hidden>Слайд 2</div>
+      <div class="slide" hidden>Слайд 3</div>
+    </div>
+    <script>
+      // JS-слайдер с autoplay: прокручивает слайды, затем останавливается.
+      // Capture дожидается стабильного кадра — остановку слайдера.
+      const slides = document.querySelectorAll(".slider .slide");
+      let step = 0;
+      const timer = setInterval(() => {
+        step += 1;
+        slides.forEach((slide, i) => {
+          slide.hidden = i !== step % slides.length;
+        });
+        if (step >= 5) clearInterval(timer);
+      }, 400);
+    </script>
+    <div class="live-clock"></div>
+    <script>
+      // Живые часы: классический флейкующий блок.
+      // Замаскирован per-page в rescreen.config.ts (маска .live-clock на home).
+      const clock = document.querySelector(".live-clock");
+      const tick = () => {
+        clock.textContent = "Сейчас: " + new Date().toLocaleTimeString("ru-RU");
+      };
+      tick();
+      setInterval(tick, 1000);
+    </script>
     <div class="cookie-banner">Мы используем cookie. Этот баннер замаскирован в конфиге.</div>
   </body>
 </html>

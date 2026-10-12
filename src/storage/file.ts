@@ -14,6 +14,7 @@ export type FileBaselineStorage = BaselineStorage & {
 interface SnapshotMeta {
   readonly capturedAt: string;
   readonly masksApplied: readonly string[];
+  readonly warnings?: readonly string[];
 }
 
 /** Layout: `baselines/`, `current/`, `diffs/`, `last-run.json`, `audit.jsonl` под rootDir. */
@@ -46,15 +47,18 @@ export function createFileStorage(rootDir?: string): FileBaselineStorage {
 
     let capturedAt = new Date();
     let masksApplied: readonly string[] = [];
+    let warnings: readonly string[] = [];
     try {
       const meta = JSON.parse(await readFile(metaPath(file), "utf8")) as SnapshotMeta;
       capturedAt = new Date(meta.capturedAt);
       masksApplied = meta.masksApplied;
+      // sidecar'ы формата до ticket 03 warnings не содержат — читаем как []
+      warnings = meta.warnings ?? [];
     } catch (err) {
       if (!isNotFound(err)) throw err;
       // метаданных нет (Baseline положили вручную) — берём значения по умолчанию
     }
-    return { key, png: new Uint8Array(png), capturedAt, masksApplied };
+    return { key, png: new Uint8Array(png), capturedAt, masksApplied, warnings };
   };
 
   const saveSnapshot = async (dir: string, snapshot: Snapshot): Promise<void> => {
@@ -64,6 +68,7 @@ export function createFileStorage(rootDir?: string): FileBaselineStorage {
     const meta: SnapshotMeta = {
       capturedAt: snapshot.capturedAt.toISOString(),
       masksApplied: snapshot.masksApplied,
+      warnings: snapshot.warnings,
     };
     await writeFile(metaPath(file), JSON.stringify(meta));
   };

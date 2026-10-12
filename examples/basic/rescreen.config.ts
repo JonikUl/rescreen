@@ -5,7 +5,12 @@ export default {
   // Глобальная маска: cookie-баннер скрыт на всех Page
   mask: [".cookie-banner"],
   pages: [
-    { name: "home", path: "/" },
+    {
+      name: "home",
+      path: "/",
+      // Per-page маска: живые часы меняются каждый прогон — скрываем их на своей Page
+      mask: [".live-clock"],
+    },
     { name: "features", path: "/features.html" },
   ],
 };

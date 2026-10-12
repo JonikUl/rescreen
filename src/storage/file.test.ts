@@ -115,8 +115,8 @@ describe("BaselineStorage (файловая реализация)", () => {
     const result: RunResult = {
       startedAt: new Date("2026-10-11T10:00:00.000Z"),
       results: [
-        { key: key(), status: "unchanged", diffRatio: 0 },
-        { key: key({ page: "news" }), status: "diff", diffRatio: 0.42 },
+        { key: key(), status: "unchanged", diffRatio: 0, masksApplied: [".cookie"] },
+        { key: key({ page: "news" }), status: "diff", diffRatio: 0.42, masksApplied: [] },
       ],
       summary: { total: 2, unchanged: 1, diffs: 1, newBaselines: 0, errors: 0 },
     };
@@ -126,6 +126,41 @@ describe("BaselineStorage (файловая реализация)", () => {
     expect(loaded?.startedAt).toEqual(result.startedAt);
     expect(loaded?.results).toEqual(result.results);
     expect(loaded?.summary).toEqual(result.summary);
+  });
+
+  it("round-trip: warnings сохраняются в sidecar вместе с masksApplied", async () => {
+    const storage = createFileStorage(root);
+    const snapshot = makeSnapshot(
+      key(),
+      encodePng(createPng(2, 2)),
+      [".cookie"],
+      new Date("2026-10-11T12:00:00.000Z"),
+      ["Стабильный кадр не достигнут за 5000 мс — используется последний кадр"],
+    );
+
+    await storage.saveCurrent(snapshot);
+    const loaded = await storage.getCurrent(key());
+
+    expect(loaded?.warnings).toEqual([
+      "Стабильный кадр не достигнут за 5000 мс — используется последний кадр",
+    ]);
+    expect(loaded?.masksApplied).toEqual([".cookie"]);
+  });
+
+  it("sidecar без warnings (формат до ticket 03) читается с warnings = []", async () => {
+    const storage = createFileStorage(root);
+    await mkdir(join(root, "current"), { recursive: true });
+    await writeFile(join(root, "current", "home__1440x900.png"), encodePng(createPng(1, 1)));
+    await writeFile(
+      join(root, "current", "home__1440x900.json"),
+      JSON.stringify({ capturedAt: "2026-10-10T00:00:00.000Z", masksApplied: [".old"] }),
+    );
+
+    const loaded = await storage.getCurrent(key());
+
+    expect(loaded).not.toBeNull();
+    expect(loaded?.warnings).toEqual([]);
+    expect(loaded?.masksApplied).toEqual([".old"]);
   });
 
   it("getBaseline по неизвестному ключу возвращает null", async () => {

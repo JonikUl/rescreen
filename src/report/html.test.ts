@@ -40,8 +40,8 @@ describe("Reporter (HTML)", () => {
     const result: RunResult = {
       startedAt: new Date("2026-10-11T10:00:00.000Z"),
       results: [
-        { key: homeKey, status: "diff", diffRatio: 0.25 },
-        { key: aboutKey, status: "unchanged", diffRatio: 0 },
+        { key: homeKey, status: "diff", diffRatio: 0.25, masksApplied: [".cookie-banner"] },
+        { key: aboutKey, status: "unchanged", diffRatio: 0, masksApplied: [] },
       ],
       summary: { total: 2, unchanged: 1, diffs: 1, newBaselines: 0, errors: 0 },
     };
@@ -60,7 +60,7 @@ describe("Reporter (HTML)", () => {
     const storage = createFileStorage(join(root, ".rescreen"));
     const result: RunResult = {
       startedAt: new Date(),
-      results: [{ key: homeKey, status: "error", error: "Сеть недоступна" }],
+      results: [{ key: homeKey, status: "error", masksApplied: [], error: "Сеть недоступна" }],
       summary: { total: 1, unchanged: 0, diffs: 0, newBaselines: 0, errors: 1 },
     };
 
@@ -69,5 +69,48 @@ describe("Reporter (HTML)", () => {
     const html = await readFile(reportPath, "utf8");
     expect(html).toContain("ошибка");
     expect(html).toContain("Сеть недоступна");
+  });
+
+  it("показывает применённые Mask'и («Скрыто масками») только когда они есть", async () => {
+    const storage = createFileStorage(join(root, ".rescreen"));
+    const result: RunResult = {
+      startedAt: new Date(),
+      results: [
+        { key: homeKey, status: "unchanged", diffRatio: 0, masksApplied: [".cookie", "#chat"] },
+        { key: aboutKey, status: "unchanged", diffRatio: 0, masksApplied: [] },
+      ],
+      summary: { total: 2, unchanged: 2, diffs: 0, newBaselines: 0, errors: 0 },
+    };
+
+    await createHtmlReporter(reportPath, { storage }).render(result);
+
+    const html = await readFile(reportPath, "utf8");
+    expect(html).toContain("Скрыто масками: .cookie, #chat");
+    // секция без масок не получает строку про маскирование
+    const aboutSection = html.split("<section>").find((s) => s.includes("about"));
+    expect(aboutSection).not.toContain("Скрыто масками");
+  });
+
+  it("включает в отчёт предупреждение для результата с warning", async () => {
+    const storage = createFileStorage(join(root, ".rescreen"));
+    const result: RunResult = {
+      startedAt: new Date(),
+      results: [
+        {
+          key: homeKey,
+          status: "unchanged",
+          diffRatio: 0,
+          masksApplied: [],
+          warning: "Стабильный кадр не достигнут за 5000 мс — используется последний кадр",
+        },
+      ],
+      summary: { total: 1, unchanged: 1, diffs: 0, newBaselines: 0, errors: 0 },
+    };
+
+    await createHtmlReporter(reportPath, { storage }).render(result);
+
+    const html = await readFile(reportPath, "utf8");
+    expect(html).toContain("Предупреждение");
+    expect(html).toContain("Стабильный кадр не достигнут");
   });
 });

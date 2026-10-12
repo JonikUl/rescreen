@@ -81,6 +81,9 @@ async function renderSection(result: SnapshotResult, storage: BaselineStorage): 
   if (result.warning !== undefined) {
     lines.push(`<p>Предупреждение: ${escapeHtml(result.warning)}</p>`);
   }
+  if (result.masksApplied.length > 0) {
+    lines.push(`<p>Скрыто масками: ${escapeHtml(result.masksApplied.join(", "))}</p>`);
+  }
   if (result.error !== undefined) {
     lines.push(`<p>Ошибка: ${escapeHtml(result.error)}</p>`);
   }

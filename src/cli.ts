@@ -61,6 +61,9 @@ function printSummary(result: RunResult, reportPath: string): void {
   );
   for (const r of result.results) {
     console.log(`  ${describeResult(r)}`);
+    if (r.warning !== undefined && r.status !== "error") {
+      console.log(`    ⚠ ${r.warning}`);
+    }
   }
   console.log(`Отчёт: ${reportPath}`);
 }

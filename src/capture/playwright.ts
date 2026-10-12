@@ -6,10 +6,21 @@ import type { Capture, CaptureTarget } from "./types.js";
 import type { Snapshot } from "../snapshot/types.js";
 
 /**
+ * Ожидание стабильного кадра: сколько одинаковых подряд скриншотов
+ * (побайтовое сравнение PNG) считаем стабильным кадром.
+ */
+export const FRAME_STABILITY_PROBES = 3;
+/** Интервал между пробами кадра при ожидании стабильности, мс. */
+export const FRAME_STABILITY_INTERVAL_MS = 300;
+/** Общий таймаут ожидания стабильного кадра, мс; при превышении — последний кадр + предупреждение. */
+export const FRAME_STABILITY_TIMEOUT_MS = 5000;
+
+/**
  * CSS-стабилизация, применяемая на каждой странице перед съёмкой:
  * CSS-анимации и переходы отключены (иначе «пульсирующие» элементы дают ложные Diff'ы).
- * Маскирование — одно правило на селектор: `visibility: hidden !important`
- * (минимально честная реализация masksApplied; ticket 03 ужесточает).
+ * Маскирование — одно правило на селектор: `visibility: hidden !important`.
+ * Правила внедряются целиком, поэтому селекторы без совпадений на странице
+ * просто не срабатывают и съёмку не портят.
  */
 function stabilizationCss(mask: readonly string[]): string {
   const maskRules = mask
@@ -22,6 +33,45 @@ function stabilizationCss(mask: readonly string[]): string {
 }
 ${maskRules}
 `;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Снимает кадры до тех пор, пока {@link FRAME_STABILITY_PROBES} подряд проб
+ * не окажутся побайтово одинаковыми, но не дольше {@link FRAME_STABILITY_TIMEOUT_MS}.
+ * Возвращает последний кадр и предупреждения (пустые, если кадр стабилизировался).
+ */
+async function shootStableFrame(shoot: () => Promise<Buffer>): Promise<{
+  png: Buffer;
+  warnings: string[];
+}> {
+  const deadline = Date.now() + FRAME_STABILITY_TIMEOUT_MS;
+  let last = await shoot();
+  let identicalInRow = 1;
+
+  while (identicalInRow < FRAME_STABILITY_PROBES) {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) {
+      return {
+        png: last,
+        warnings: [
+          `Стабильный кадр не достигнут за ${FRAME_STABILITY_TIMEOUT_MS} мс — используется последний кадр`,
+        ],
+      };
+    }
+    await sleep(Math.min(FRAME_STABILITY_INTERVAL_MS, remaining));
+    const next = await shoot();
+    if (Buffer.compare(last, next) === 0) {
+      identicalInRow += 1;
+    } else {
+      last = next;
+      identicalInRow = 1;
+    }
+  }
+  return { png: last, warnings: [] };
 }
 
 /**
@@ -51,15 +101,19 @@ export async function createPlaywrightCapture(): Promise<Capture> {
         await page.goto(target.url, { waitUntil: "networkidle" });
         await page.addStyleTag({ content: stabilizationCss(target.mask) });
 
-        const png = target.key.element
-          ? await captureElement(page, target.key.element, target.key.page)
-          : await page.screenshot({ fullPage: true });
+        const shoot = (): Promise<Buffer> =>
+          target.key.element
+            ? captureElement(page, target.key.element, target.key.page)
+            : page.screenshot({ fullPage: true });
+
+        const { png, warnings } = await shootStableFrame(shoot);
 
         return {
           key: target.key,
           png: new Uint8Array(png),
           capturedAt: new Date(),
           masksApplied: target.mask,
+          warnings,
         };
       } finally {
         await context.close();

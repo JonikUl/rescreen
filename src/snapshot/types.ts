@@ -20,7 +20,9 @@ export interface SnapshotKey {
  * Snapshot — скриншот одной Page (или одного Element'а), сделанный в ходе одного Run.
  *
  * Инвариант: `png` — валидное PNG-изображение; `masksApplied` — именно те Mask'и,
- * которые были применены при снятии (глобальные + per-page, в порядке применения).
+ * которые были применены при снятии (глобальные + per-page, в порядке применения);
+ * `warnings` — нефатальные предупреждения, возникшие при снятии (например, стабильный
+ * кадр не достигнут за таймаут), на русском языке; пустой список, если снятие прошло чисто.
  */
 export interface Snapshot {
   readonly key: SnapshotKey;
@@ -28,4 +30,9 @@ export interface Snapshot {
   readonly png: Uint8Array;
   readonly capturedAt: Date;
   readonly masksApplied: readonly string[];
+  /**
+   * Нефатальные предупреждения при снятии (стабильный кадр не достигнут за таймаут и т.п.).
+   * Наличие предупреждений не отменяет Snapshot: используется последний снятый кадр.
+   */
+  readonly warnings: readonly string[];
 }

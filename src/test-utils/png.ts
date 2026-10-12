@@ -61,6 +61,7 @@ export function makeSnapshot(
   png: Uint8Array,
   masksApplied: readonly string[] = [],
   capturedAt: Date = new Date("2026-10-11T12:00:00.000Z"),
+  warnings: readonly string[] = [],
 ): Snapshot {
-  return { key, png, capturedAt, masksApplied };
+  return { key, png, capturedAt, masksApplied, warnings };
 }
