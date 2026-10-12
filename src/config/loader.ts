@@ -17,10 +17,17 @@ function isNotFound(err: unknown): boolean {
 }
 
 /**
- * Загружает и валидирует конфиг из `rescreen.config.ts` (расширения .js/.mjs — fallback).
+ * Загружает конфиг из `rescreen.config.ts` (расширения .js/.mjs — fallback).
  *
- * Реализация контракта из `./types.ts`: бросает {@link ConfigError} с сообщением
- * на русском при отсутствии файла или пустом `pages`. Глубокая валидация — ticket 08.
+ * Постусловие: возвращённый конфиг удовлетворяет структурным инвариантам схемы:
+ * непустые `baseUrl`, `pages`, `name`/`path` каждой Page.
+ *
+ * Ошибки: {@link ConfigError} с человекочитаемым сообщением на русском,
+ * если файл не найден или структурный инвариант нарушен — до старта любого Run.
+ *
+ * Пока НЕ проверяется (глубокая валидация — ticket 08): валидность URL,
+ * начало path с `/`, непустота селекторов, threshold ∈ [0, 1], уникальность name,
+ * допустимость символов name (см. предусловие {@link SnapshotKey}).
  */
 export async function loadConfig(cwd: string = process.cwd()): Promise<RescreenConfig> {
   const dir = resolve(cwd);
@@ -69,9 +76,13 @@ function validateConfig(raw: unknown, file: string): RescreenConfig {
 }
 
 /**
- * Применяет значения по умолчанию к конфигу (реализация контракта из `./types.ts`).
- * Не мутирует вход; порядок Page сохраняется. Слияние глобальных и per-page Mask'ов
- * здесь не выполняется — это обязанность Runner'а.
+ * Применяет значения по умолчанию к конфигу.
+ *
+ * Предусловие: `config` валиден (см. инварианты в `./types.ts`).
+ * Постусловие: в каждой ResolvedPageConfig viewport = page.viewport ?? config.viewport ?? DEFAULT_VIEWPORT,
+ * threshold = page.threshold ?? config.threshold ?? DEFAULT_THRESHOLD; отсутствующие mask/elements — пустые списки.
+ * Инвариант: не мутирует вход; порядок Page сохраняется. Слияние глобальных и
+ * per-page Mask'ов здесь не выполняется — это обязанность Runner'а.
  */
 export function resolveConfig(config: RescreenConfig): ResolvedConfig {
   const pages: ResolvedPageConfig[] = config.pages.map((page) => ({
