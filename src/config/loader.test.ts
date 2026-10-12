@@ -1,11 +1,15 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
 
 import { loadConfig, resolveConfig } from "./loader.js";
 import { ConfigError } from "./types.js";
+
+// Путь к корневому index.ts вычисляется от этого файла — без машинно-зависимых путей
+const indexModule = fileURLToPath(new URL("../index.ts", import.meta.url));
 
 describe("loadConfig", () => {
   let dir: string;
@@ -22,7 +26,7 @@ describe("loadConfig", () => {
     await writeFile(
       join(dir, "rescreen.config.ts"),
       [
-        "import { defineConfig } from '/home/jonik/Work/rescreen/src/index.ts';",
+        `import { defineConfig } from ${JSON.stringify(indexModule)};`,
         "export default defineConfig({",
         "  baseUrl: 'https://example.com',",
         "  pages: [{ name: 'home', path: '/' }],",
