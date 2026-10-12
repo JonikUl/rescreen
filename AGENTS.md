@@ -14,6 +14,11 @@ Default five-role vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `
 
 Single-context: one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
 
+## Commits
+
+- Atomic: one logical change per commit.
+- English, subject line only, conventional format (`type(scope): subject`, see `git log`); a body only when the diff doesn't explain the why.
+
 ## CodeGraph
 
 This project has a CodeGraph MCP server configured, exposing a single tool: `codegraph_explore`. CodeGraph is a tree-sitter-parsed knowledge graph of every symbol, edge, and file. Reads are sub-millisecond and return structural information grep cannot.
