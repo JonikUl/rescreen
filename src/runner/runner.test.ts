@@ -11,6 +11,7 @@ import { resolveConfig } from "../config/loader.js";
 import { createPixelmatchDiffEngine } from "../diff/pixelmatch.js";
 import { createFileStorage } from "../storage/file.js";
 import { createHtmlReporter } from "../report/html.js";
+import { formatSummaryLine } from "../text/plural.js";
 import { createPng, encodePng, fillRect } from "../test-utils/png.js";
 import type { Capture, CaptureTarget } from "../capture/types.js";
 import type { Snapshot } from "../snapshot/types.js";
@@ -254,11 +255,7 @@ describe("Runner (конвейер Run'а через фейковый Capture)",
     const result = await runner.run();
 
     const html = await readFile(reportPath, "utf8");
-    const s = result.summary;
-    expect(html).toContain(
-      `Проверено ${s.pages} страниц (${s.total} снимков): без изменений ${s.unchanged}, ` +
-        `изменилось ${s.diffs}, новых ${s.newBaselines}, пропущено ${s.skipped}, ошибок ${s.errors}`,
-    );
+    expect(html).toContain(formatSummaryLine(result.summary));
   });
 
   it("неизвестное имя Page бросает ошибку до старта прогона", async () => {
