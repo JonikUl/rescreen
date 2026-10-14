@@ -38,3 +38,6 @@ export { toExitCode } from "./runner/exit-code.js";
 export type { Reporter } from "./report/types.js";
 export { createHtmlReporter } from "./report/html.js";
 export type { HtmlReporterDeps } from "./report/html.js";
+export { openReport, reportPathFor } from "./report/open.js";
+export type { OpenReportDeps, OpenReportResult } from "./report/open.js";
+export { formatSummaryLine, pluralize } from "./text/plural.js";

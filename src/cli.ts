@@ -1,6 +1,4 @@
 #!/usr/bin/env node
-import { join } from "node:path";
-
 import { ConfigError } from "./config/types.js";
 import { loadConfig, resolveConfig } from "./config/loader.js";
 import { createPlaywrightCapture } from "./capture/playwright.js";
@@ -11,6 +9,8 @@ import { createRunner } from "./runner/runner.js";
 import { toExitCode } from "./runner/exit-code.js";
 import { createApprover } from "./approve/approve.js";
 import { createHtmlReporter } from "./report/html.js";
+import { openReport, reportPathFor } from "./report/open.js";
+import { formatSummaryLine } from "./text/plural.js";
 import type { RunResult, SnapshotResult } from "./runner/types.js";
 import type { SnapshotKey } from "./snapshot/types.js";
 
@@ -22,8 +22,9 @@ const USAGE = `rescreen — визуальное регрессионное те
   rescreen approve [page...]  подтвердить Diff'ы последнего прогона:
                               текущие Snapshot'ы становятся Baseline'ами
                               (без аргументов — все Page с Diff'ами)
+  rescreen open               открыть последний Report в браузере
 
-Команды init, open появятся в следующих тикетах.`;
+Команда init появится в следующих тикетах.`;
 
 async function run(pageNames: readonly string[]): Promise<number> {
   let capture: Capture | null = null;
@@ -32,7 +33,7 @@ async function run(pageNames: readonly string[]): Promise<number> {
     const resolved = resolveConfig(config);
     const storage = createFileStorage();
     capture = await createPlaywrightCapture();
-    const reportPath = join(storage.rootDir, "report.html");
+    const reportPath = reportPathFor(storage);
     const runner = createRunner({
       config: resolved,
       capture,
@@ -86,15 +87,23 @@ async function approve(pageNames: readonly string[]): Promise<number> {
   }
 }
 
+async function open(): Promise<number> {
+  const storage = createFileStorage();
+  const result = await openReport({ storage });
+  if (result.ok) {
+    console.log(result.message);
+    return 0;
+  }
+  console.error(result.message);
+  return 2;
+}
+
 function printSummary(result: RunResult, reportPath: string): void {
-  const s = result.summary;
   console.log("rescreen: прогон завершён");
-  console.log(
-    `Проверено ${s.pages} страниц (${s.total} снимков): без изменений ${s.unchanged}, изменилось ${s.diffs}, новых ${s.newBaselines}, пропущено ${s.skipped}, ошибок ${s.errors}`,
-  );
+  console.log(formatSummaryLine(result.summary));
   for (const r of result.results) {
     console.log(`  ${describeResult(r)}`);
-    if (r.warning !== undefined && r.status !== "error" && r.status !== "skipped") {
+    if (r.warning !== undefined) {
       console.log(`    ⚠ ${r.warning}`);
     }
   }
@@ -111,7 +120,7 @@ function describeResult(result: SnapshotResult): string {
     case "new-baseline":
       return `${title} — создан новый Baseline`;
     case "skipped":
-      return `${title} — ПРОПУЩЕН: ${result.warning ?? "элемент не найден"}`;
+      return `${title} — ПРОПУЩЕН`;
     case "error":
       return `${title} — ОШИБКА: ${result.error ?? "неизвестная ошибка"}`;
     default: {
@@ -139,7 +148,10 @@ async function main(): Promise<number> {
   if (command === "approve") {
     return approve(rest);
   }
-  if (command === "init" || command === "open") {
+  if (command === "open") {
+    return open();
+  }
+  if (command === "init") {
     console.error(`rescreen ${command}: команда появится в следующих тикетах.`);
     return 2;
   }
