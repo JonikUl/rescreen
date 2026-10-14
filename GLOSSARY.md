@@ -37,7 +37,7 @@ _Avoid_: pending, red, failed, новый diff
 _Avoid_: log, output, summary
 
 **Mask**:
-Область Page, заданная CSS-селектором и исключённая из сравнения Snapshot'а с Baseline'ом; в Report'е помечается как непроверяемая.
+Область Page, заданная CSS-селектором и исключённая из сравнения Snapshot'а с Baseline'ом; на снимке закрывается штриховкой-оверлеем, в Report'е помечается как непроверяемая.
 _Avoid_: ignore, hide, exclude
 
 **Threshold**:

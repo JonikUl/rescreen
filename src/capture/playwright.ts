@@ -18,13 +18,29 @@ export const FRAME_STABILITY_TIMEOUT_MS = 5000;
 /**
  * CSS-стабилизация, применяемая на каждой странице перед съёмкой:
  * CSS-анимации и переходы отключены (иначе «пульсирующие» элементы дают ложные Diff'ы).
- * Маскирование — одно правило на селектор: `visibility: hidden !important`.
- * Правила внедряются целиком, поэтому селекторы без совпадений на странице
- * просто не срабатывают и съёмку не портят.
+ *
+ * Маскирование — правило на селектор: поверх элемента натягивается ::after-оверлей
+ * со штриховкой (position: relative на элементе + absolute-оверлей во всю его
+ * область). Замаскированная область исключена из сравнения и при этом видима на
+ * снимке как непроверяемая (spec, story 17). Оверлей привязан к самому элементу,
+ * поэтому не разъезжается при position: fixed и трансформациях. Селекторы без
+ * совпадений на странице просто не срабатывают и съёмку не портят.
  */
 function stabilizationCss(mask: readonly string[]): string {
   const maskRules = mask
-    .map((selector) => `${selector} { visibility: hidden !important; }`)
+    .map(
+      (selector) => `${selector} { position: relative !important; }
+${selector}::after {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 2147483647 !important;
+  pointer-events: none !important;
+  /* Вертикальные полосы с жёсткими границами — без антиалиасинга,
+     цвета детерминированы (на них опираются тесты). */
+  background: repeating-linear-gradient(90deg, #b8b8b8 0 8px, #d3d3d3 8px 16px) !important;
+}`,
+    )
     .join("\n");
   return `
 *, *::before, *::after {

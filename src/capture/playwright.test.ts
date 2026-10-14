@@ -4,6 +4,8 @@ import type { AddressInfo } from "node:net";
 
 import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 
+import { PNG } from "pngjs";
+
 import {
   createPlaywrightCapture,
   FRAME_STABILITY_INTERVAL_MS,
@@ -178,6 +180,25 @@ describe.skipIf(process.env.RESCREEN_SKIP_BROWSER === "1")(
         expect(first.warnings).toEqual([]);
         expect(first.masksApplied).toEqual([".clock"]);
         expect(equalBytes(first.png, second.png)).toBe(true);
+      },
+    );
+
+    it(
+      "замаскированная область помечена на снимке штриховкой: вся область — только цвета штрихов",
+      { timeout: 20_000 },
+      async () => {
+        const snapshot = await capture.capture(target("/masked.html", { mask: [".clock"] }));
+        const png = PNG.sync.read(Buffer.from(snapshot.png));
+
+        // .clock: 400×100 под блоком #content высотой 150 → y ∈ [150, 250)
+        const stripe = new Set(["b8b8b8", "d3d3d3"]);
+        for (let y = 150; y < 250; y++) {
+          for (let x = 0; x < 400; x++) {
+            const idx = (png.width * y + x) << 2;
+            const hex = png.data.subarray(idx, idx + 3).toString("hex");
+            expect(stripe.has(hex), `пиксель (${x}, ${y}) = #${hex}`).toBe(true);
+          }
+        }
       },
     );
 
