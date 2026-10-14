@@ -6,7 +6,9 @@ export type {
   ResolvedPageConfig,
   Viewport,
 } from "./config/types.js";
-export { loadConfig, resolveConfig } from "./config/loader.js";
+export { loadConfig, resolveConfig, validateConfig } from "./config/loader.js";
+export { initProject } from "./config/init.js";
+export type { InitResult } from "./config/init.js";
 export type { Snapshot, SnapshotKey } from "./snapshot/types.js";
 export { ElementNotFoundError } from "./capture/types.js";
 export type { Capture, CaptureTarget } from "./capture/types.js";

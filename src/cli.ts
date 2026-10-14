@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { ConfigError } from "./config/types.js";
 import { loadConfig, resolveConfig } from "./config/loader.js";
+import { initProject } from "./config/init.js";
 import { createPlaywrightCapture } from "./capture/playwright.js";
 import type { Capture } from "./capture/types.js";
 import { createPixelmatchDiffEngine } from "./diff/pixelmatch.js";
@@ -17,14 +18,13 @@ import type { SnapshotKey } from "./snapshot/types.js";
 const USAGE = `rescreen — визуальное регрессионное тестирование
 
 Использование:
+  rescreen init               создать rescreen.config.ts с примером и директорию .rescreen/
   rescreen run [page...]      снять Snapshot'ы и сравнить с Baseline'ами
                               (без аргументов — все Page из конфига)
   rescreen approve [page...]  подтвердить Diff'ы последнего прогона:
                               текущие Snapshot'ы становятся Baseline'ами
                               (без аргументов — все Page с Diff'ами)
-  rescreen open               открыть последний Report в браузере
-
-Команда init появится в следующих тикетах.`;
+  rescreen open               открыть последний Report в браузере`;
 
 async function run(pageNames: readonly string[]): Promise<number> {
   let capture: Capture | null = null;
@@ -80,6 +80,23 @@ async function approve(pageNames: readonly string[]): Promise<number> {
     for (const s of result.approved) {
       console.log(`  ${describeKey(s.key)}`);
     }
+    return 0;
+  } catch (err) {
+    console.error(`Ошибка: ${err instanceof Error ? err.message : String(err)}`);
+    return 2;
+  }
+}
+
+async function init(): Promise<number> {
+  try {
+    const result = await initProject(process.cwd());
+    if (result.configCreated) {
+      console.log("rescreen: создан rescreen.config.ts — укажите baseUrl и список Page");
+    } else {
+      console.log("rescreen: конфиг уже существует — не перезаписываю");
+    }
+    console.log(`rescreen: директория хранилища: ${result.storageDir}`);
+    console.log("Дальше: rescreen run");
     return 0;
   } catch (err) {
     console.error(`Ошибка: ${err instanceof Error ? err.message : String(err)}`);
@@ -152,8 +169,7 @@ async function main(): Promise<number> {
     return open();
   }
   if (command === "init") {
-    console.error(`rescreen ${command}: команда появится в следующих тикетах.`);
-    return 2;
+    return init();
   }
   console.error(`Неизвестная команда "${command}".\n\n${USAGE}`);
   return 2;
