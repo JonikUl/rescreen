@@ -2,27 +2,93 @@
 
 Open-source CLI (MIT) для визуального регрессионного тестирования: снимает Snapshot'ы заданных страниц сайта, сравнивает их с Baseline'ами, показывает расхождения в самодостаточном HTML Report'е на русском языке и даёт workflow подтверждения изменений (Approve).
 
-Статус: ранняя разработка. Команд пока нет — зафиксированы контракты модулей (`src/*/types.ts`).
+Стабилизация против флейкости — из коробки: ожидание network idle, отключение CSS-анимаций, маскирование селекторов (cookie-баннеры, даты, виджеты), ожидание стабильного кадра для JS-анимаций (слайдеры с autoplay).
 
-## Требования
+## Установка
 
-- Node.js >= 22.18
-- pnpm (версия зафиксирована в `packageManager`, подтягивается через corepack)
-- Chromium для съёмки Snapshot'ов — устанавливается явным шагом (postinstall-скриптов нет):
+Требования: Node.js >= 22.18. Нативных npm-зависимостей нет — установка не требует компиляции.
 
 ```bash
-pnpm exec playwright install chromium
+npm i -g rescreen        # глобально
+npx rescreen <команда>   # или разово через npx
 ```
+
+Для съёмки Snapshot'ов нужен Chromium — устанавливается явным шагом (postinstall-скриптов нет):
+
+```bash
+npx playwright install chromium
+```
+
+## Быстрый старт
+
+```bash
+rescreen init      # создать rescreen.config.ts с примером и директорию .rescreen/
+rescreen run       # снять Snapshot'ы всех Page и сравнить с Baseline'ами
+rescreen approve   # подтвердить Diff'ы: текущие Snapshot'ы становятся Baseline'ами
+rescreen open      # открыть последний HTML Report в браузере
+```
+
+1. `rescreen init` создаёт типизированный `rescreen.config.ts` и `.rescreen/` (хранилище Baseline'ов, вне git по умолчанию — там лежит `.gitignore`). Отредактируйте `baseUrl` и список `pages`.
+2. `rescreen run` при первом прогоне автоматически создаёт Baseline'ы — отдельная команда инициализации эталонов не нужна. Повторный прогон сравнивает с ними и печатает резюме: сколько Page без изменений, сколько с Diff'ами, сколько новых Baseline'ов.
+3. Если Diff ожидаемый — `rescreen approve` (все Diff'ы) или `rescreen approve home news` (выборочно, по именам Page). Неожиданный — чините вёрстку и переснимайте только эти Page: `rescreen run home`.
+4. `rescreen open` открывает Report: резюме человеческим языком («изменилось 3 страницы из 20»), группировка «изменились / без изменений / новые», сравнение «было/стало» и Diff-изображение с подсветкой.
+
+## Конфигурация
+
+`rescreen.config.ts` в корне проекта:
+
+```ts
+import { defineConfig } from "rescreen";
+
+export default defineConfig({
+  baseUrl: "https://example.com", // полный URL Page = baseUrl + path
+  viewport: { width: 1440, height: 900 }, // viewport по умолчанию (это и есть дефолт)
+  mask: [".cookie-banner"], // глобальные Mask'и — скрываются на всех Page
+  threshold: 0, // Threshold по умолчанию ∈ [0, 1]; 0 — любое расхождение = Diff (дефолт)
+  pages: [
+    {
+      name: "home", // уникальный slug (буквы, цифры, "-", "_"): CLI, ключи хранилища, Report
+      path: "/", // путь относительно baseUrl, начинается с "/"
+      viewport: { width: 390, height: 844 }, // переопределение viewport для этой Page
+      mask: [".live-clock"], // per-page Mask'и — в дополнение к глобальным
+      threshold: 0.01, // переопределение Threshold для этой Page
+      elements: ["header", ".main-nav"], // Element'ы со своими Snapshot'ами и Baseline'ами
+    },
+  ],
+});
+```
+
+Snapshot'ы снимаются full-page по умолчанию. Замаскированные области исключаются из сравнения и помечаются штриховкой на снимке и в Report'е. Невалидный конфиг (нет `pages`, некорректный `baseUrl`, пустой селектор, `threshold` вне [0, 1]) — понятная ошибка до старта Run'а.
+
+## Команды и exit-коды
+
+| Команда                      | Действие                                                                                                                              |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `rescreen init`              | Создать конфиг с примером и `.rescreen/`; существующий конфиг не затирается                                                           |
+| `rescreen run [page...]`     | Прогон: без аргументов — все Page, с аргументами — только перечисленные                                                               |
+| `rescreen approve [page...]` | Approve: без аргументов — все неподтверждённые Diff'ы, с аргументами — только указанные Page. Нечего аппрувить — сообщение, не ошибка |
+| `rescreen open`              | Открыть последний Report в системном браузере                                                                                         |
+
+Exit-коды:
+
+| Код | Значение                                     |
+| --- | -------------------------------------------- |
+| `0` | `run`: Diff'ов нет; остальные команды: успех |
+| `1` | `run`: есть хотя бы один Diff                |
+| `2` | Ошибка: конфиг, браузер, сеть                |
 
 ## Разработка
 
-Тулчейн — [vite+](https://viteplus.dev) (`vp`): форматирование, линт, типизация, тесты и сборка одной dev-зависимостью. pnpm остаётся пакетным менеджером (`vp` делегирует ему).
+Тулчейн — [vite+](https://viteplus.dev) (`vp`): форматирование, линт, типизация, тесты и сборка одной dev-зависимостью. pnpm остаётся пакетным менеджером (`vp` делегирует ему); версия зафиксирована в `packageManager` (подтягивается через corepack).
 
 ```bash
-pnpm install     # установка зависимостей
-pnpm exec vp check   # oxfmt + oxlint + tsc одной командой
-pnpm exec vp test    # тесты (Vitest)
-pnpm exec vp pack    # сборка CLI (tsdown: bin + d.ts)
+pnpm install    # установка зависимостей
+pnpm exec playwright install chromium  # браузер для интеграционных тестов Capture
+pnpm check      # oxfmt + oxlint + tsc одной командой
+pnpm test       # тесты (Vitest)
+pnpm build      # сборка CLI (tsdown: bin + d.ts)
 ```
+
+Браузерные тесты пропускаются с `RESCREEN_SKIP_BROWSER=1`.
 
 > **Риск: vite+ молод** (1.0 — сентябрь 2026). Риск принят осознанно: под капотом стандартные движки, поэтому откат дешёвый — заменить `vite-plus` на `vitest` + `oxlint` + `oxfmt` + `tsdown` по отдельности с почти тем же конфигом. При откате также удалить overrides из `pnpm-workspace.yaml`.
