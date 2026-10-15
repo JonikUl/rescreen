@@ -1,13 +1,16 @@
 /**
  * Схема конфигурации `rescreen.config.ts` и её контракт.
  *
- * Инварианты валидного конфига (проверяются загрузчиком, см. ticket 08):
- * - `pages` непустой; `name` каждой Page уникален в пределах конфига;
+ * Инварианты валидного конфига:
+ * - `pages` непустой; `name` каждой Page уникален в пределах конфига и состоит
+ *   из slug-алфавита (буквы, цифры, `-`, `_`) — предусловие SnapshotKey;
  * - `baseUrl` — валидный http(s) URL;
  * - `path` каждой Page начинается с `/`;
  * - каждый CSS-селектор в `mask` и `elements` — непустая строка;
  * - `threshold` ∈ [0, 1] — доля отличающихся пикселей (0 — любое расхождение является Diff'ом);
  * - размеры viewport — положительные целые.
+ *
+ * Все инварианты гарантируются при загрузке — см. контракт `loadConfig` в `./loader.js`.
  */
 
 /** Размер окна браузера в пикселях. */
@@ -79,26 +82,10 @@ export function defineConfig(config: RescreenConfig): RescreenConfig {
   return config;
 }
 
-/**
- * Применяет значения по умолчанию к конфигу.
- *
- * Предусловие: `config` валиден (см. инварианты выше).
- * Постусловие: в каждой ResolvedPageConfig viewport = page.viewport ?? config.viewport ?? DEFAULT_VIEWPORT,
- * threshold = page.threshold ?? config.threshold ?? DEFAULT_THRESHOLD; отсутствующие mask/elements — пустые списки.
- * Инвариант: не мутирует вход; порядок Page сохраняется.
- */
-export declare function resolveConfig(config: RescreenConfig): ResolvedConfig;
-
 /** Ошибка загрузки или валидации конфига. `message` — человекочитаемый, на русском. */
 export class ConfigError extends Error {
   override readonly name = "ConfigError";
 }
 
-/**
- * Загружает и валидирует конфиг из `rescreen.config.ts`.
- *
- * Постусловие: возвращённый конфиг удовлетворяет всем инвариантам схемы.
- * Ошибки: бросает {@link ConfigError} с понятным сообщением (нет pages, битый URL,
- * пустой селектор, threshold вне [0, 1], дублирующееся name) — до старта любого Run.
- */
-export declare function loadConfig(cwd?: string): Promise<RescreenConfig>;
+// Реализации loadConfig/resolveConfig и их контракты — в `./loader.js`
+// (единственный источник правды; здесь намеренно нет declare-дублей).
