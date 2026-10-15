@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
 import type { AuditEntry, BaselineStorage } from "./types.js";
@@ -26,14 +26,32 @@ export function createFileStorage(rootDir?: string): FileBaselineStorage {
   const dirDiffs = join(root, "diffs");
 
   /**
-   * Ключ → имя файла: `<page>__<width>x<height>[__<base64url(element)>].png`;
-   * base64url без паддинга — селекторы со слешем, пробелами и юникодом кодируются без потерь.
+   * Ключ → имя файла: `<page>__<width>x<height>[__<hex(element)>].png`;
+   * hex — селекторы со слешем, пробелами и юникодом кодируются без потерь,
+   * а кодировка не содержит `_` и `x`, поэтому имя файла однозначно
+   * разбирается обратно ({@link filenameToKey}): `__<digits>x<digits>` может
+   * встретиться только как разделитель viewport'а, а hex-суффикс не может
+   * содержать разделитель `__`.
    */
   const keyToFilename = (key: SnapshotKey): string => {
     const base = `${key.page}__${key.viewport.width}x${key.viewport.height}`;
     if (!key.element) return `${base}.png`;
-    const encoded = Buffer.from(key.element, "utf8").toString("base64url");
+    const encoded = Buffer.from(key.element, "utf8").toString("hex");
     return `${base}__${encoded}.png`;
+  };
+
+  /**
+   * Обратное разбиение имени файла в ключ (для {@link listUnapprovedDiffs}).
+   * Page — жадно: slug может сам содержать `__` и даже `__<digits>x<digits>`.
+   * Файлы, не подходящие под формат ключа (посторонние), возвращают null.
+   */
+  const filenameToKey = (filename: string): SnapshotKey | null => {
+    const match = /^(.+)__(\d+)x(\d+)(?:__([0-9a-f]+))?\.png$/.exec(filename);
+    if (!match) return null;
+    const [, page, width, height, element] = match;
+    const viewport = { width: Number(width), height: Number(height) };
+    if (element === undefined) return { page: page!, viewport };
+    return { page: page!, viewport, element: Buffer.from(element, "hex").toString("utf8") };
   };
 
   const readSnapshot = async (dir: string, key: SnapshotKey): Promise<Snapshot | null> => {
@@ -97,20 +115,25 @@ export function createFileStorage(rootDir?: string): FileBaselineStorage {
         );
       }
       const existing = await readSnapshot(dirBaselines, key);
-      if (existing && Buffer.compare(Buffer.from(existing.png), Buffer.from(current.png)) === 0) {
-        return existing; // идемпотентно: Baseline уже равен текущему снимку
+      const alreadyApproved =
+        existing !== null &&
+        Buffer.compare(Buffer.from(existing.png), Buffer.from(current.png)) === 0;
+      if (!alreadyApproved) {
+        await saveSnapshot(dirBaselines, current);
+        const entry: AuditEntry = {
+          at: new Date().toISOString(),
+          page: key.page,
+          viewport: key.viewport,
+          ...(key.element === undefined ? {} : { element: key.element }),
+          sha256: createHash("sha256").update(current.png).digest("hex"),
+        };
+        await mkdir(root, { recursive: true });
+        await appendFile(join(root, "audit.jsonl"), `${JSON.stringify(entry)}\n`);
       }
-      await saveSnapshot(dirBaselines, current);
-      const entry: AuditEntry = {
-        at: new Date().toISOString(),
-        page: key.page,
-        viewport: key.viewport,
-        ...(key.element === undefined ? {} : { element: key.element }),
-        sha256: createHash("sha256").update(current.png).digest("hex"),
-      };
-      await mkdir(root, { recursive: true });
-      await appendFile(join(root, "audit.jsonl"), `${JSON.stringify(entry)}\n`);
-      return current;
+      // Diff-файл удаляется на обеих ветках (ADR-0003): неподтверждённого Diff'а
+      // по ключу больше нет, в том числе при идемпотентном approve
+      await rm(join(dirDiffs, keyToFilename(key)), { force: true });
+      return alreadyApproved && existing !== null ? existing : current;
     },
 
     async saveRunResult(result) {
@@ -151,6 +174,24 @@ export function createFileStorage(rootDir?: string): FileBaselineStorage {
     async saveDiff(key, png) {
       await mkdir(dirDiffs, { recursive: true });
       await writeFile(join(dirDiffs, keyToFilename(key)), Buffer.from(png));
+    },
+
+    async deleteDiff(key) {
+      await rm(join(dirDiffs, keyToFilename(key)), { force: true });
+    },
+
+    async listUnapprovedDiffs() {
+      let files: string[];
+      try {
+        files = await readdir(dirDiffs);
+      } catch (err) {
+        if (isNotFound(err)) return [];
+        throw err;
+      }
+      return files
+        .sort()
+        .map(filenameToKey)
+        .filter((k): k is SnapshotKey => k !== null);
     },
   };
 }

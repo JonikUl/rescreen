@@ -106,6 +106,9 @@ export function createRunner(deps: RunnerDeps): Runner {
           warning,
         };
       }
+      // Snapshot снова совпал с Baseline'ом: неподтверждённого Diff'а по ключу
+      // больше нет — удаляем устаревший Diff-файл (ADR-0003)
+      await deps.storage.deleteDiff(key);
       return {
         key,
         status: "unchanged",

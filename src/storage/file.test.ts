@@ -212,6 +212,66 @@ describe("BaselineStorage (файловая реализация)", () => {
     expect((await storage.getCurrent(k))?.png).toEqual(current.png);
   });
 
+  it("listUnapprovedDiffs: пусто без Diff-файлов; ключи с Diff-файлами читаются обратно (включая элементные)", async () => {
+    const storage = createFileStorage(root);
+    expect(await storage.listUnapprovedDiffs()).toEqual([]);
+
+    const page = key();
+    const element = key({ element: "nav .menu > li:nth-child(2) / главная" });
+    const other = key({ page: "about", viewport: { width: 800, height: 600 } });
+    const diffPng = encodePng(createPng(1, 1));
+    await storage.saveDiff(element, diffPng);
+    await storage.saveDiff(page, diffPng);
+    await storage.saveDiff(other, diffPng);
+
+    const pending = await storage.listUnapprovedDiffs();
+
+    // Порядок стабилен (отсортирован по имени файла), ключи восстановлены по компонентам
+    expect(pending).toEqual([other, page, element]);
+  });
+
+  it("listUnapprovedDiffs не падает на пустом хранилище и игнорирует посторонние файлы в diffs/", async () => {
+    const storage = createFileStorage(root);
+    await mkdir(join(root, "diffs"), { recursive: true });
+    await writeFile(join(root, "diffs", "notes.txt"), "не diff");
+
+    expect(await storage.listUnapprovedDiffs()).toEqual([]);
+  });
+
+  it("deleteDiff удаляет Diff-файл; идемпотентен: удаление несуществующего — не ошибка", async () => {
+    const storage = createFileStorage(root);
+    const k = key();
+    await storage.saveDiff(k, encodePng(createPng(1, 1)));
+
+    await storage.deleteDiff(k);
+
+    expect(await storage.getDiff(k)).toBeNull();
+    expect(await storage.listUnapprovedDiffs()).toEqual([]);
+    // повторное удаление и удаление по неизвестному ключу — без ошибки
+    await storage.deleteDiff(k);
+    await storage.deleteDiff(key({ page: "never-existed" }));
+  });
+
+  it("approve удаляет Diff-файл по ключу (ADR-0003), в том числе на идемпотентной ветке", async () => {
+    const storage = createFileStorage(root);
+    const k = key();
+    const png = encodePng(createPng(2, 2, { r: 9, g: 9, b: 9 }));
+    await storage.saveCurrent(makeSnapshot(k, png));
+    await storage.saveDiff(k, encodePng(createPng(1, 1)));
+
+    await storage.approve(k);
+    expect(await storage.getDiff(k)).toBeNull();
+    expect(await storage.listUnapprovedDiffs()).toEqual([]);
+
+    // Diff-файл появился снова без нового Run'а (граничное состояние): идемпотентный
+    // approve (Baseline == текущему) тоже обязан его удалить, не пиша в аудит
+    await storage.saveDiff(k, encodePng(createPng(1, 1)));
+    await storage.approve(k);
+    expect(await storage.getDiff(k)).toBeNull();
+    const audit = await readFile(join(root, "audit.jsonl"), "utf8");
+    expect(audit.trim().split("\n").filter(Boolean)).toHaveLength(1);
+  });
+
   it("несуществующий файл снимка возвращает null, а не падает", async () => {
     const storage = createFileStorage(root);
     // png-файл есть, а метаданные отсутствуют — хранилище не должно падать
@@ -248,6 +308,37 @@ describe("BaselineStorage (файловая реализация)", () => {
         const loaded = await storage.getBaseline(k);
         expect(loaded?.png).toEqual(snapshot.png);
         expect(loaded?.key).toEqual(k);
+      }),
+      { numRuns: 30 },
+    );
+  });
+
+  it("property: ключ любого сохранённого Diff'а восстанавливается листингом (fast-check)", async () => {
+    const storage = createFileStorage(root);
+    const slug = fc.string({
+      unit: fc.constantFrom(
+        ..."abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_".split(""),
+      ),
+      minLength: 1,
+      maxLength: 24,
+    });
+    const arbitraryKey = fc.record({
+      page: slug,
+      viewport: fc.record({
+        width: fc.integer({ min: 1, max: 10000 }),
+        height: fc.integer({ min: 1, max: 10000 }),
+      }),
+      element: fc.option(fc.string({ unit: "grapheme", minLength: 1, maxLength: 60 }), {
+        nil: undefined,
+      }),
+    });
+
+    await fc.assert(
+      fc.asyncProperty(arbitraryKey, async (k) => {
+        await storage.saveDiff(k, encodePng(createPng(1, 1)));
+        expect(await storage.listUnapprovedDiffs()).toContainEqual(k);
+        await storage.deleteDiff(k);
+        expect(await storage.listUnapprovedDiffs()).not.toContainEqual(k);
       }),
       { numRuns: 30 },
     );

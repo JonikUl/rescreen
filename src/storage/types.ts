@@ -33,7 +33,12 @@ export interface AuditEntry {
  *   `capturedAt` — через sidecar-файл рядом с PNG) — для любых допустимых компонентов
  *   ключа, включая селекторы с `/`, пробелами и юникодом (проверяется property-based тестами);
  * - Baseline и текущий Snapshot одного ключа хранятся независимо: запись текущего
- *   Snapshot'а не изменяет Baseline и наоборот (кроме {@link approve}).
+ *   Snapshot'а не изменяет Baseline и наоборот (кроме {@link approve});
+ * - ADR-0003: Diff-файл по ключу лежит в хранилище ⟺ по этому ключу есть
+ *   неподтверждённый Diff. Поддерживается совместно с Runner'ом: Run удаляет
+ *   Diff-файл при статусе `unchanged` ({@link deleteDiff}), {@link approve} — при
+ *   подтверждении. Diff-файл переживает filtered run — неподтверждённость не
+ *   привязана к последнему Run'у.
  */
 export interface BaselineStorage {
   /**
@@ -62,7 +67,9 @@ export interface BaselineStorage {
    *
    * Предусловие: по ключу существует текущий Snapshot (был Run).
    * Постусловие: `getBaseline(key)` побайтово равен текущему Snapshot'у на момент вызова;
-   * Audit Log пополнился ровно одной записью.
+   * Audit Log пополнился ровно одной записью; Diff-файл по ключу удалён
+   * (`getDiff(key)` возвращает null) — неподтверждённого Diff'а по ключу больше нет
+   * (ADR-0003), в том числе на идемпотентной ветке.
    * Инвариант: идемпотентно — повторный approve без нового Run'а не меняет Baseline
    * и не добавляет записей.
    *
@@ -90,10 +97,28 @@ export interface BaselineStorage {
 
   /**
    * Сохраняет Diff-изображение по ключу (вызывает Runner при обнаружении Diff'а).
-   * Постусловие: `getDiff(key)` возвращает эти байты.
+   * По ADR-0003 сам факт наличия Diff-файла — маркер неподтверждённого Diff'а.
+   * Постусловие: `getDiff(key)` возвращает эти байты; ключ присутствует в
+   * {@link listUnapprovedDiffs}.
    * Инвариант: не изменяет ни Baseline, ни текущий Snapshot.
    */
   saveDiff(key: SnapshotKey, png: Uint8Array): Promise<void>;
+
+  /**
+   * Удаляет Diff-изображение по ключу (вызывает Runner при статусе `unchanged`
+   * и {@link approve} при подтверждении — поддержание инварианта ADR-0003).
+   * Постусловие: `getDiff(key)` возвращает null; ключа нет в {@link listUnapprovedDiffs}.
+   * Инвариант: идемпотентно — удаление несуществующего Diff'а не является ошибкой.
+   */
+  deleteDiff(key: SnapshotKey): Promise<void>;
+
+  /**
+   * Возвращает ключи всех неподтверждённых Diff'ов — всех, для которых лежит
+   * Diff-файл (ADR-0003), включая элементные Snapshot'ы и Diff'ы Page, которых
+   * могло не быть в последнем Run'е (filtered run, удалённые из конфига Page).
+   * Инвариант: чистое чтение; порядок ключей стабилен (отсортирован).
+   */
+  listUnapprovedDiffs(): Promise<readonly SnapshotKey[]>;
 
   /**
    * Возвращает результат последнего Run'а или null, если Run'ов ещё не было.

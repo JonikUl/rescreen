@@ -205,6 +205,27 @@ describe("Runner (конвейер Run'а через фейковый Capture)",
     expect(toExitCode(result)).toBe(1);
   });
 
+  it("Run при статусе unchanged удаляет устаревший Diff-файл ключа (ADR-0003)", async () => {
+    const first = fixtures(["home", solid(255, 0, 0)], ["about", solid(0, 255, 0)]);
+    const capture = new FakeCapture(first);
+    const { runner, storage } = await setupRunner(storageDir, reportPath, capture);
+    await runner.run();
+
+    const home = { page: "home", viewport: { width: 1440, height: 900 } };
+    first.set("home", solid(0, 0, 255));
+    await runner.run();
+    expect(await storage.getDiff(home)).not.toBeNull();
+
+    // Страница вернулась к Baseline'у: Diff-файл обязан исчезнуть —
+    // неподтверждённого Diff'а по ключу больше нет
+    first.set("home", solid(255, 0, 0));
+    const result = await runner.run();
+
+    expect(result.results.find((r) => r.key.page === "home")?.status).toBe("unchanged");
+    expect(await storage.getDiff(home)).toBeNull();
+    expect(await storage.listUnapprovedDiffs()).toEqual([]);
+  });
+
   it("ошибка съёмки одной Page не прерывает остальные: статус error, exit-код 2", async () => {
     const capture = new FakeCapture(
       fixtures(["home", solid(255, 0, 0)], ["about", solid(0, 255, 0)]),

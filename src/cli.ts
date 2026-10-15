@@ -21,9 +21,9 @@ const USAGE = `rescreen — визуальное регрессионное те
   rescreen init               создать rescreen.config.ts с примером и директорию .rescreen/
   rescreen run [page...]      снять Snapshot'ы и сравнить с Baseline'ами
                               (без аргументов — все Page из конфига)
-  rescreen approve [page...]  подтвердить Diff'ы последнего прогона:
+  rescreen approve [page...]  подтвердить неподтверждённые Diff'ы:
                               текущие Snapshot'ы становятся Baseline'ами
-                              (без аргументов — все Page с Diff'ами)
+                              (без аргументов — все неподтверждённые)
   rescreen open               открыть последний Report в браузере`;
 
 async function run(pageNames: readonly string[]): Promise<number> {
