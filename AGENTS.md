@@ -19,6 +19,16 @@ Single-context: one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agent
 - Atomic: one logical change per commit.
 - English, subject line only, conventional format (`type(scope): subject`, see `git log`); a body only when the diff doesn't explain the why.
 
+## Commands
+
+Run the package.json scripts in these exact shapes — uniform commands keep permission allowlists matching:
+
+- `pnpm check` (add `--fix` to auto-fix) — format + lint + typecheck.
+- `pnpm test` — full suite; `pnpm test src/<path>.test.ts` — single test file.
+- `pnpm build` — pack to `dist/`.
+
+Trim long output by appending `2>&1 | tail -N`, where N is a multiple of 10 (default `tail -10`).
+
 ## CodeGraph
 
 This project has a CodeGraph MCP server configured, exposing a single tool: `codegraph_explore`. CodeGraph is a tree-sitter-parsed knowledge graph of every symbol, edge, and file. Reads are sub-millisecond and return structural information grep cannot.
