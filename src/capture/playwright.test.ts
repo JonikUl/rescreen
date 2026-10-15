@@ -227,11 +227,11 @@ describe.skipIf(process.env.RESCREEN_SKIP_BROWSER === "1")(
         expect(snapshot.warnings[0]).toContain(String(FRAME_STABILITY_TIMEOUT_MS));
       },
     );
-
-    it("дефолты стабильности кадра зафиксированы контрактом", () => {
-      expect(FRAME_STABILITY_PROBES).toBe(3);
-      expect(FRAME_STABILITY_INTERVAL_MS).toBe(300);
-      expect(FRAME_STABILITY_TIMEOUT_MS).toBe(5000);
-    });
   },
 );
+
+it("дефолты стабильности кадра зафиксированы контрактом", () => {
+  expect(FRAME_STABILITY_PROBES).toBe(3);
+  expect(FRAME_STABILITY_INTERVAL_MS).toBe(300);
+  expect(FRAME_STABILITY_TIMEOUT_MS).toBe(5000);
+});
