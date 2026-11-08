@@ -11,6 +11,8 @@ import { toExitCode } from "./runner/exit-code.js";
 import { createApprover } from "./approve/approve.js";
 import { createHtmlReporter } from "./report/html.js";
 import { openReport, reportPathFor } from "./report/open.js";
+import { getStatusBoard } from "./status/status.js";
+import type { StatusEntry } from "./status/status.js";
 import { formatSummaryLine } from "./text/plural.js";
 import type { RunResult, SnapshotResult } from "./runner/types.js";
 import type { SnapshotKey } from "./snapshot/types.js";
@@ -24,6 +26,7 @@ const USAGE = `rescreen — визуальное регрессионное те
   rescreen approve [page...]  подтвердить неподтверждённые Diff'ы:
                               текущие Snapshot'ы становятся Baseline'ами
                               (без аргументов — все неподтверждённые)
+  rescreen status             показать актуальное состояние всех Page из конфига
   rescreen open               открыть последний Report в браузере`;
 
 async function run(pageNames: readonly string[]): Promise<number> {
@@ -115,6 +118,55 @@ async function open(): Promise<number> {
   return 2;
 }
 
+async function status(): Promise<number> {
+  try {
+    const config = await loadConfig(process.cwd());
+    const storage = createFileStorage();
+    const board = await getStatusBoard({ config, storage });
+    console.log("rescreen: актуальное состояние Page");
+    for (const entry of board) {
+      console.log(`  ${describeStatusEntry(entry)}`);
+      if (entry.state?.warning !== undefined) {
+        console.log(`    ⚠ ${entry.state.warning}`);
+      }
+    }
+    return 0;
+  } catch (err) {
+    if (err instanceof ConfigError) {
+      console.error(`Ошибка конфигурации: ${err.message}`);
+    } else {
+      console.error(`Ошибка: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    return 2;
+  }
+}
+
+function describeStatusEntry(entry: StatusEntry): string {
+  const title = describeKey(entry.key);
+  const state = entry.state;
+  if (state === null) return `${title} — нет данных`;
+  const timestamp =
+    state.capturedAt === undefined
+      ? `Проверено: ${state.attemptedAt.toISOString()}`
+      : `Снято: ${state.capturedAt.toISOString()}`;
+  switch (state.status) {
+    case "unchanged":
+      return `${title} — без изменений; ${timestamp}`;
+    case "diff":
+      return `${title} — есть Diff (${((state.diffRatio ?? 0) * 100).toFixed(2)}% пикселей); ${timestamp}`;
+    case "new-baseline":
+      return `${title} — без изменений (создан Baseline); ${timestamp}`;
+    case "skipped":
+      return `${title} — ПРОПУЩЕН; ${timestamp}`;
+    case "error":
+      return `${title} — ОШИБКА: ${state.error ?? "неизвестная ошибка"}; ${timestamp}`;
+    default: {
+      const unknown: never = state.status;
+      throw new Error(`Неизвестный статус SnapshotResult: ${String(unknown)}`);
+    }
+  }
+}
+
 function printSummary(result: RunResult, reportPath: string): void {
   console.log("rescreen: прогон завершён");
   console.log(formatSummaryLine(result.summary));
@@ -164,6 +216,9 @@ async function main(): Promise<number> {
   }
   if (command === "approve") {
     return approve(rest);
+  }
+  if (command === "status") {
+    return status();
   }
   if (command === "open") {
     return open();

@@ -42,4 +42,6 @@ export { createHtmlReporter } from "./report/html.js";
 export type { HtmlReporterDeps } from "./report/html.js";
 export { openReport, reportPathFor } from "./report/open.js";
 export type { OpenReportDeps, OpenReportResult } from "./report/open.js";
+export { getStatusBoard } from "./status/status.js";
+export type { StatusBoardDeps, StatusEntry } from "./status/status.js";
 export { formatSummaryLine, pluralize } from "./text/plural.js";
