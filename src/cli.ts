@@ -68,8 +68,12 @@ function reportError(err: unknown): number {
   return 2;
 }
 
+function describeTarget(key: SnapshotKey): string {
+  return `(${key.viewport.width}×${key.viewport.height}${key.element === undefined ? "" : ` :: ${key.element}`})`;
+}
+
 function describeKey(key: SnapshotKey): string {
-  return `${key.page} (${key.viewport.width}×${key.viewport.height}${key.element === undefined ? "" : ` :: ${key.element}`})`;
+  return `${key.page} ${describeTarget(key)}`;
 }
 
 async function approve(pageNames: readonly string[]): Promise<number> {
@@ -128,10 +132,15 @@ async function status(): Promise<number> {
     const storage = createFileStorage();
     const board = await getStatusBoard({ config, storage });
     console.log("rescreen: актуальное состояние Page");
+    let currentPage: string | null = null;
     for (const entry of board) {
-      console.log(`  ${describeStatusEntry(entry)}`);
+      if (entry.key.page !== currentPage) {
+        currentPage = entry.key.page;
+        console.log(`  ${currentPage}`);
+      }
+      console.log(`    ${describeStatusEntry(entry)}`);
       if (entry.state?.warning !== undefined) {
-        console.log(`    ⚠ ${entry.state.warning}`);
+        console.log(`      ⚠ ${entry.state.warning}`);
       }
     }
     return 0;
@@ -141,7 +150,7 @@ async function status(): Promise<number> {
 }
 
 function describeStatusEntry(entry: StatusEntry): string {
-  const title = describeKey(entry.key);
+  const title = describeTarget(entry.key);
   const state = entry.state;
   if (state === null) return `${title} — нет данных`;
   const timestamp =
