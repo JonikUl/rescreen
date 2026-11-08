@@ -378,6 +378,96 @@ describe("BaselineStorage (файловая реализация)", () => {
     const audit = await readFile(join(root, "audit.jsonl"), "utf8");
     expect(audit.trim().split("\n").filter(Boolean)).toHaveLength(1);
   });
+  it("approve переводит актуальный Diff состояния в unchanged и сохраняет даты", async () => {
+    const storage = createFileStorage(root);
+    const k = key();
+    await storage.saveCurrent(makeSnapshot(k, encodePng(createPng(2, 2))));
+    const result: RunResult = {
+      startedAt: new Date("2026-10-11T10:00:00.000Z"),
+      results: [
+        {
+          key: k,
+          status: "diff",
+          attemptedAt: new Date("2026-10-11T10:00:01.000Z"),
+          capturedAt: new Date("2026-10-11T10:00:02.000Z"),
+          diffRatio: 0.2,
+          masksApplied: [],
+        },
+      ],
+      summary: {
+        pages: 1,
+        total: 1,
+        unchanged: 0,
+        diffs: 1,
+        newBaselines: 0,
+        skipped: 0,
+        errors: 0,
+      },
+    };
+    await storage.saveRunResult(result);
+
+    await storage.approve(k);
+
+    expect(await storage.listSnapshotStates()).toEqual([
+      { ...result.results[0], status: "unchanged", diffRatio: 0 },
+    ]);
+  });
+
+  it("approve старого Diff'а не заменяет более свежую ошибку состояния", async () => {
+    const storage = createFileStorage(root);
+    const k = key();
+    await storage.saveCurrent(makeSnapshot(k, encodePng(createPng(2, 2))));
+    await storage.saveDiff(k, encodePng(createPng(1, 1)));
+    await storage.saveRunResult({
+      startedAt: new Date("2026-10-11T10:00:00.000Z"),
+      results: [
+        {
+          key: k,
+          status: "diff",
+          attemptedAt: new Date("2026-10-11T10:00:01.000Z"),
+          capturedAt: new Date("2026-10-11T10:00:02.000Z"),
+          diffRatio: 0.2,
+          masksApplied: [],
+        },
+      ],
+      summary: {
+        pages: 1,
+        total: 1,
+        unchanged: 0,
+        diffs: 1,
+        newBaselines: 0,
+        skipped: 0,
+        errors: 0,
+      },
+    });
+    const failedRun: RunResult = {
+      startedAt: new Date("2026-10-11T11:00:00.000Z"),
+      results: [
+        {
+          key: k,
+          status: "error",
+          attemptedAt: new Date("2026-10-11T11:00:01.000Z"),
+          masksApplied: [],
+          error: "Сеть недоступна",
+        },
+      ],
+      summary: {
+        pages: 1,
+        total: 1,
+        unchanged: 0,
+        diffs: 0,
+        newBaselines: 0,
+        skipped: 0,
+        errors: 1,
+      },
+    };
+    await storage.saveRunResult(failedRun);
+
+    await storage.approve(k);
+
+    expect(await storage.listSnapshotStates()).toEqual(failedRun.results);
+    expect(await storage.getDiff(k)).toBeNull();
+  });
 
   it("несуществующий файл снимка возвращает null, а не падает", async () => {
     const storage = createFileStorage(root);

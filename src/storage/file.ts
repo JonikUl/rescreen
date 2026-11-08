@@ -169,6 +169,20 @@ export function createFileStorage(rootDir?: string): FileBaselineStorage {
       // Diff-файл удаляется на обеих ветках (ADR-0003): неподтверждённого Diff'а
       // по ключу больше нет, в том числе при идемпотентном approve
       await rm(join(dirDiffs, keyToFilename(key)), { force: true });
+
+      const statePath = join(root, "state.json");
+      const states = await readSnapshotStates(statePath);
+      let stateChanged = false;
+      const updated = states.map((state) => {
+        if (snapshotKeyId(state.key) !== snapshotKeyId(key) || state.status !== "diff") {
+          return state;
+        }
+        stateChanged = true;
+        return { ...state, status: "unchanged" as const, diffRatio: 0 };
+      });
+      if (stateChanged) {
+        await writeFile(statePath, JSON.stringify(updated.map(serializeSnapshotResult), null, 2));
+      }
       return alreadyApproved && existing !== null ? existing : current;
     },
 
