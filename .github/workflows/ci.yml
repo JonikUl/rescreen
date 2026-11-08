@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [develop]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: pnpm из packageManager через corepack
+        run: corepack enable
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Chromium для интеграционных тестов Capture
+        run: pnpm exec playwright install --with-deps chromium
+
+      - run: pnpm check
+
+      - run: pnpm test
+
+      - run: pnpm build
+
+      - name: Бамп версии требует секцию в CHANGELOG.md
+        if: github.event_name == 'pull_request'
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          git fetch origin master --depth=1
+          BASE=$(git show FETCH_HEAD:package.json | grep '"version"' | cut -d'"' -f4)
+          if [ "$VERSION" != "$BASE" ] && ! grep -q "^## \[$VERSION\]" CHANGELOG.md; then
+            echo "::error::Версия поднята до $VERSION — добавьте секцию ## [$VERSION] в CHANGELOG.md"
+            exit 1
+          fi
