@@ -51,3 +51,11 @@ _Avoid_: component, block, region
 **Audit Log**:
 Журнал операций Approve: что подтверждено, когда и какой Snapshot стал Baseline'ом.
 _Avoid_: history, changelog
+
+**Доска состояния**:
+Актуальное представление последнего известного состояния Snapshot'ов текущего конфига независимо от того, какой Run был последним. В отличие от Report, объединяет результаты разных Run'ов и учитывает Approve.
+_Avoid_: history, last run
+
+**Prune**:
+Явное удаление устаревших Snapshot'ов, которые больше не соответствуют Page, Element или viewport текущего конфига, вместе с их Baseline'ами, Diff'ами и состоянием. Не изменяет Report и Audit Log.
+_Avoid_: clean, автоматическая очистка
