@@ -84,68 +84,43 @@ export function createRunner(deps: RunnerDeps): Runner {
       await deps.storage.saveCurrent(snapshot);
 
       const warning = snapshot.warnings.length > 0 ? snapshot.warnings.join("; ") : undefined;
+      const base = {
+        key,
+        attemptedAt,
+        capturedAt: snapshot.capturedAt,
+        masksApplied: snapshot.masksApplied,
+        warning,
+      };
       const baseline = await deps.storage.getBaseline(key);
       if (!baseline) {
         await deps.storage.saveBaseline(snapshot);
-        return {
-          key,
-          status: "new-baseline",
-          attemptedAt,
-          capturedAt: snapshot.capturedAt,
-          masksApplied: snapshot.masksApplied,
-          warning,
-        };
+        return { ...base, status: "new-baseline" };
       }
 
       const diff = await deps.diffEngine.compare(baseline.png, snapshot.png);
       if (diff.ratio > page.threshold) {
         if (diff.diffPng !== null) await deps.storage.saveDiff(key, diff.diffPng);
-        return {
-          key,
-          status: "diff",
-          attemptedAt,
-          capturedAt: snapshot.capturedAt,
-          diffRatio: diff.ratio,
-          masksApplied: snapshot.masksApplied,
-          warning,
-        };
+        return { ...base, status: "diff", diffRatio: diff.ratio };
       }
       // Snapshot снова совпал с Baseline'ом: неподтверждённого Diff'а по ключу
       // больше нет — удаляем устаревший Diff-файл (ADR-0003)
       await deps.storage.deleteDiff(key);
-      return {
-        key,
-        status: "unchanged",
-        attemptedAt,
-        capturedAt: snapshot.capturedAt,
-        diffRatio: diff.ratio,
-        masksApplied: snapshot.masksApplied,
-        warning,
-      };
+      return { ...base, status: "unchanged", diffRatio: diff.ratio };
     } catch (err) {
+      const base = { key, attemptedAt, masksApplied: target.mask };
       if (err instanceof DimensionMismatchError) {
         return {
-          key,
+          ...base,
           status: "error",
-          attemptedAt,
-          masksApplied: target.mask,
           error: `${err.message} (доработка поведения — позже)`,
         };
       }
       if (err instanceof ElementNotFoundError) {
-        return {
-          key,
-          status: "skipped",
-          attemptedAt,
-          masksApplied: target.mask,
-          warning: err.message,
-        };
+        return { ...base, status: "skipped", warning: err.message };
       }
       return {
-        key,
+        ...base,
         status: "error",
-        attemptedAt,
-        masksApplied: target.mask,
         error: err instanceof Error ? err.message : String(err),
       };
     }
