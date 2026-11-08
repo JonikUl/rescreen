@@ -20,7 +20,7 @@
     "url": "git+https://github.com/JonikUl/rescreen.git"
   },
   "bin": {
-    "rescreen": "./dist/cli.mjs"
+    "rescreen": "dist/cli.mjs"
   },
   "files": [
     "dist"
