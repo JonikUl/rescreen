@@ -52,17 +52,20 @@ async function run(pageNames: readonly string[]): Promise<number> {
     printSummary(result, reportPath);
     return toExitCode(result);
   } catch (err) {
-    if (err instanceof ConfigError) {
-      console.error(`Ошибка конфигурации: ${err.message}`);
-    } else {
-      console.error(`Ошибка: ${err instanceof Error ? err.message : String(err)}`);
-    }
-    return 2;
+    return reportError(err);
   } finally {
     if (capture !== null) {
       await capture.dispose().catch(() => {});
     }
   }
+}
+
+function reportError(err: unknown): number {
+  const detail = err instanceof Error ? err.message : String(err);
+  const message =
+    err instanceof ConfigError ? `Ошибка конфигурации: ${detail}` : `Ошибка: ${detail}`;
+  console.error(message);
+  return 2;
 }
 
 function describeKey(key: SnapshotKey): string {
@@ -88,8 +91,7 @@ async function approve(pageNames: readonly string[]): Promise<number> {
     }
     return 0;
   } catch (err) {
-    console.error(`Ошибка: ${err instanceof Error ? err.message : String(err)}`);
-    return 2;
+    return reportError(err);
   }
 }
 
@@ -105,8 +107,7 @@ async function init(): Promise<number> {
     console.log("Дальше: rescreen run");
     return 0;
   } catch (err) {
-    console.error(`Ошибка: ${err instanceof Error ? err.message : String(err)}`);
-    return 2;
+    return reportError(err);
   }
 }
 
@@ -135,12 +136,7 @@ async function status(): Promise<number> {
     }
     return 0;
   } catch (err) {
-    if (err instanceof ConfigError) {
-      console.error(`Ошибка конфигурации: ${err.message}`);
-    } else {
-      console.error(`Ошибка: ${err instanceof Error ? err.message : String(err)}`);
-    }
-    return 2;
+    return reportError(err);
   }
 }
 
@@ -196,12 +192,7 @@ async function prune(args: readonly string[]): Promise<number> {
     if (dryRun) console.log("Для удаления выполните: rescreen prune");
     return 0;
   } catch (err) {
-    if (err instanceof ConfigError) {
-      console.error(`Ошибка конфигурации: ${err.message}`);
-    } else {
-      console.error(`Ошибка: ${err instanceof Error ? err.message : String(err)}`);
-    }
-    return 2;
+    return reportError(err);
   }
 }
 
