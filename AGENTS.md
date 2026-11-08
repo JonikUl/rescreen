@@ -29,6 +29,8 @@ Run the package.json scripts in these exact shapes — uniform commands keep per
 
 Trim long output by appending `2>&1 | tail -N`. N is always a multiple of 10 (default `tail -10`) — values like `tail -3` break the permission allowlist and are not accepted.
 
+Pipes mask exit codes: `pnpm check 2>&1 | tail -10 && …` succeeds even when the check fails. Chain with `set -o pipefail; …` or run the check unpiped before committing.
+
 ## CodeGraph
 
 This project has a CodeGraph MCP server configured, exposing a single tool: `codegraph_explore`. CodeGraph is a tree-sitter-parsed knowledge graph of every symbol, edge, and file. Reads are sub-millisecond and return structural information grep cannot.
