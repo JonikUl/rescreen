@@ -27,8 +27,14 @@ function serializeSnapshotResult(result: SnapshotResult): SerializedSnapshotResu
   };
 }
 
-function deserializeSnapshotResult(result: SerializedSnapshotResult): SnapshotResult {
+/**
+ * Разбор сериализованного результата; null для записей старого формата
+ * (без `attemptedAt`, до введения per-key дат) — они пропускаются, а не
+ * превращаются в Invalid Date. Миграции нет: файл перезаписывается следующим Run'ом.
+ */
+function deserializeSnapshotResult(result: SerializedSnapshotResult): SnapshotResult | null {
   const { attemptedAt, capturedAt, ...rest } = result;
+  if (typeof attemptedAt !== "string") return null;
   return {
     ...rest,
     attemptedAt: new Date(attemptedAt),
@@ -45,7 +51,9 @@ async function readSnapshotStates(file: string): Promise<SnapshotResult[]> {
     throw err;
   }
   const parsed = JSON.parse(raw) as SerializedSnapshotResult[];
-  return parsed.map((result) => deserializeSnapshotResult(result));
+  return parsed
+    .map((result) => deserializeSnapshotResult(result))
+    .filter((result): result is SnapshotResult => result !== null);
 }
 
 interface SnapshotMeta {
@@ -270,7 +278,9 @@ export function createFileStorage(rootDir?: string): FileBaselineStorage {
       };
       return {
         startedAt: new Date(parsed.startedAt),
-        results: parsed.results.map(deserializeSnapshotResult),
+        results: parsed.results
+          .map(deserializeSnapshotResult)
+          .filter((result): result is SnapshotResult => result !== null),
         summary: parsed.summary,
       };
     },

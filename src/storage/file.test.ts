@@ -248,6 +248,29 @@ describe("BaselineStorage (файловая реализация)", () => {
     expect((await storage.getLastRunResult())?.results).toEqual(filtered.results);
   });
 
+  it("last-run.json старого формата (без attemptedAt) читается без Invalid Date", async () => {
+    const storage = createFileStorage(root);
+    const legacy = {
+      startedAt: "2026-10-11T10:00:00.000Z",
+      results: [{ key: key(), status: "unchanged", diffRatio: 0, masksApplied: [] }],
+      summary: {
+        pages: 1,
+        total: 1,
+        unchanged: 1,
+        diffs: 0,
+        newBaselines: 0,
+        skipped: 0,
+        errors: 0,
+      },
+    };
+    await writeFile(join(root, "last-run.json"), JSON.stringify(legacy));
+
+    const loaded = await storage.getLastRunResult();
+
+    expect(loaded?.startedAt).toEqual(new Date("2026-10-11T10:00:00.000Z"));
+    expect(loaded?.results).toEqual([]);
+  });
+
   it("round-trip: warnings сохраняются в sidecar вместе с masksApplied", async () => {
     const storage = createFileStorage(root);
     const snapshot = makeSnapshot(
