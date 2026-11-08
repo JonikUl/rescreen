@@ -1,0 +1,74 @@
+name: Publish
+
+on:
+  push:
+    branches: [master]
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: pnpm из packageManager через corepack
+        run: corepack enable
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Chromium для интеграционных тестов Capture
+        run: pnpm exec playwright install --with-deps chromium
+
+      - run: pnpm check
+
+      - run: pnpm test
+
+      - run: pnpm build
+
+      - name: Версия уже опубликована?
+        id: version
+        run: |
+          V=$(node -p "require('./package.json').version")
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          if npm view "rescreen@$V" version > /dev/null 2>&1; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Уже опубликована — no-op
+        if: steps.version.outputs.published == 'true'
+        run: echo "rescreen@${{ steps.version.outputs.version }} уже в npm — пропускаю публикацию"
+
+      - name: Секция версии в CHANGELOG.md
+        if: steps.version.outputs.published == 'false'
+        run: |
+          if ! grep -q "^## \[${{ steps.version.outputs.version }}\]" CHANGELOG.md; then
+            echo "::error::В CHANGELOG.md нет секции ## [${{ steps.version.outputs.version }}]"
+            exit 1
+          fi
+
+      - name: npm publish --provenance
+        if: steps.version.outputs.published == 'false'
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Тег и GitHub Release
+        if: steps.version.outputs.published == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          V=${{ steps.version.outputs.version }}
+          git tag "v$V"
+          git push origin "v$V"
+          awk "/^## \[$V\]/{f=1; next} f && /^## \[/{exit} f" CHANGELOG.md > release-notes.md
+          gh release create "v$V" --title "v$V" --notes-file release-notes.md
