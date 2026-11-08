@@ -27,7 +27,7 @@ Run the package.json scripts in these exact shapes — uniform commands keep per
 - `pnpm test` — full suite; `pnpm test src/<path>.test.ts` — single test file.
 - `pnpm build` — pack to `dist/`.
 
-Trim long output by appending `2>&1 | tail -N`, where N is a multiple of 10 (default `tail -10`).
+Trim long output by appending `2>&1 | tail -N`. N is always a multiple of 10 (default `tail -10`) — values like `tail -3` break the permission allowlist and are not accepted.
 
 ## CodeGraph
 
