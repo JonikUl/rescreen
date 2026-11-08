@@ -1,5 +1,8 @@
 # rescreen
 
+[![CI](https://github.com/JonikUl/rescreen/actions/workflows/ci.yml/badge.svg)](https://github.com/JonikUl/rescreen/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/rescreen)](https://www.npmjs.com/package/rescreen)
+
 Open-source CLI (MIT) для визуального регрессионного тестирования: снимает Snapshot'ы заданных страниц сайта, сравнивает их с Baseline'ами, показывает расхождения в самодостаточном HTML Report'е на русском языке и даёт workflow подтверждения изменений (Approve).
 
 Стабилизация против флейкости — из коробки: ожидание network idle, отключение CSS-анимаций, маскирование селекторов (cookie-баннеры, даты, виджеты), ожидание стабильного кадра для JS-анимаций (слайдеры с autoplay).
@@ -84,6 +87,14 @@ Exit-коды:
 | `2` | Ошибка: конфиг, браузер, сеть                |
 
 `status` возвращает `0` после успешного чтения даже при наличии Diff'ов или ошибок на доске.
+
+## Релизный процесс
+
+Релизы публикуются через GitHub; ручной `npm publish` не используется:
+
+1. Разработка ведётся в `develop`; релиз — PR из `develop` в `master`. CI на PR гоняет `pnpm check`, полные тесты (с Chromium) и сборку; мерж возможен только при зелёном CI (branch protection на `master`).
+2. В том же PR поднимается `version` в `package.json` и добавляется секция `## [X.Y.Z]` в `CHANGELOG.md` (формат Keep a Changelog, по-русски). CI падает, если версия поднята, а секции нет.
+3. Мерж в `master` запускает publish-workflow: если версия ещё не опубликована в npm — `npm publish --provenance`, тег `vX.Y.Z` и GitHub Release с текстом секции из CHANGELOG. Повторный запуск на той же версии — no-op.
 
 ## Разработка
 
