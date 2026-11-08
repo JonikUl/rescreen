@@ -88,7 +88,8 @@ export interface Runner {
    *
    * Постусловие: для каждой выбранной Page (и каждого её Element'а) в результате
    * ровно один SnapshotResult; Baseline'ы созданы для всех `new-baseline`; текущие
-   * Snapshot'ы и RunResult сохранены; Report сгенерирован.
+   * Snapshot'ы и RunResult сохранены; результаты слиты в per-key состояние без потери
+   * состояний Page вне filtered run; Report сгенерирован.
    *
    * Инвариант: ошибка одного Snapshot'а не прерывает остальные (статус `error`);
    * первый Run без Baseline'а создаёт Baseline автоматически.

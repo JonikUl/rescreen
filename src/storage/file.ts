@@ -3,6 +3,7 @@ import { appendFile, mkdir, readdir, readFile, rm, writeFile } from "node:fs/pro
 import { join, resolve } from "node:path";
 
 import type { AuditEntry, BaselineStorage } from "./types.js";
+import { snapshotKeyId } from "../snapshot/key.js";
 import type { Snapshot, SnapshotKey } from "../snapshot/types.js";
 import type { RunResult, SnapshotResult } from "../runner/types.js";
 
@@ -33,6 +34,18 @@ function deserializeSnapshotResult(result: SerializedSnapshotResult): SnapshotRe
     attemptedAt: new Date(attemptedAt),
     ...(capturedAt === undefined ? {} : { capturedAt: new Date(capturedAt) }),
   };
+}
+
+async function readSnapshotStates(file: string): Promise<SnapshotResult[]> {
+  let raw: string;
+  try {
+    raw = await readFile(file, "utf8");
+  } catch (err) {
+    if (isNotFound(err)) return [];
+    throw err;
+  }
+  const parsed = JSON.parse(raw) as SerializedSnapshotResult[];
+  return parsed.map((result) => deserializeSnapshotResult(result));
 }
 
 interface SnapshotMeta {
@@ -160,6 +173,14 @@ export function createFileStorage(rootDir?: string): FileBaselineStorage {
     },
 
     async saveRunResult(result) {
+      const statePath = join(root, "state.json");
+      const states = new Map(
+        (await readSnapshotStates(statePath)).map((state) => [snapshotKeyId(state.key), state]),
+      );
+      for (const state of result.results) {
+        states.set(snapshotKeyId(state.key), state);
+      }
+
       await mkdir(root, { recursive: true });
       const json = {
         startedAt: result.startedAt.toISOString(),
@@ -167,6 +188,14 @@ export function createFileStorage(rootDir?: string): FileBaselineStorage {
         summary: result.summary,
       };
       await writeFile(join(root, "last-run.json"), JSON.stringify(json, null, 2));
+      const merged = [...states.values()].sort((a, b) =>
+        snapshotKeyId(a.key).localeCompare(snapshotKeyId(b.key)),
+      );
+      await writeFile(statePath, JSON.stringify(merged.map(serializeSnapshotResult), null, 2));
+    },
+
+    listSnapshotStates() {
+      return readSnapshotStates(join(root, "state.json"));
     },
 
     async getLastRunResult() {

@@ -1,5 +1,5 @@
 import type { Snapshot, SnapshotKey } from "../snapshot/types.js";
-import type { RunResult } from "../runner/types.js";
+import type { RunResult, SnapshotResult } from "../runner/types.js";
 import type { Viewport } from "../config/types.js";
 
 /**
@@ -78,10 +78,20 @@ export interface BaselineStorage {
   approve(key: SnapshotKey): Promise<Snapshot>;
 
   /**
-   * Сохраняет результат Run'а как последний (для команды `approve` и Report'а).
-   * Инвариант: хранится только последний результат; история Run'ов не ведётся (spec: Out of Scope).
+   * Сохраняет результат Run'а как последний для Report'а и сливает его результаты
+   * в per-key состояние для доски Status.
+   * Постусловие: `last-run.json` содержит только этот Run; в `state.json` заменены
+   * только ключи из `result.results`, остальные состояния сохранены.
+   * Инвариант: история Run'ов и состояний не ведётся (spec: Out of Scope).
    */
   saveRunResult(result: RunResult): Promise<void>;
+
+  /**
+   * Возвращает последние per-key состояния, включая ключи, которых уже нет в конфиге.
+   * Если `state.json` ещё не создан, возвращает пустой список без миграции артефактов.
+   * Инвариант: чистое чтение; порядок состояний стабилен (отсортирован по ключу).
+   */
+  listSnapshotStates(): Promise<readonly SnapshotResult[]>;
 
   /**
    * Возвращает текущий Snapshot последнего Run'а по ключу или null.

@@ -161,6 +161,7 @@ describe("Runner (конвейер Run'а через фейковый Capture)",
     expect(snapshotResult.attemptedAt).toBeInstanceOf(Date);
     expect(snapshotResult.capturedAt).toEqual(current?.capturedAt);
     expect(snapshotResult.attemptedAt.getTime()).toBeLessThanOrEqual(current!.capturedAt.getTime());
+    expect(await storage.listSnapshotStates()).toEqual(result.results);
   });
 
   it("повторный Run на неизменных снимках: unchanged, exit-код 0", async () => {

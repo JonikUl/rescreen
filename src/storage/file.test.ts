@@ -155,6 +155,99 @@ describe("BaselineStorage (файловая реализация)", () => {
     expect(loaded?.summary).toEqual(result.summary);
   });
 
+  it("saveRunResult сохраняет per-key состояние с датами для доски Status", async () => {
+    const storage = createFileStorage(root);
+    expect(await storage.listSnapshotStates()).toEqual([]);
+
+    const result: RunResult = {
+      startedAt: new Date("2026-10-11T10:00:00.000Z"),
+      results: [
+        {
+          key: key(),
+          status: "diff",
+          attemptedAt: new Date("2026-10-11T10:00:01.000Z"),
+          capturedAt: new Date("2026-10-11T10:00:02.000Z"),
+          diffRatio: 0.42,
+          masksApplied: [],
+        },
+      ],
+      summary: {
+        pages: 1,
+        total: 1,
+        unchanged: 0,
+        diffs: 1,
+        newBaselines: 0,
+        skipped: 0,
+        errors: 0,
+      },
+    };
+
+    await storage.saveRunResult(result);
+
+    expect(await storage.listSnapshotStates()).toEqual(result.results);
+  });
+
+  it("filtered run сливает только свои ключи, а last-run остаётся итогом одного Run'а", async () => {
+    const storage = createFileStorage(root);
+    const first: RunResult = {
+      startedAt: new Date("2026-10-11T10:00:00.000Z"),
+      results: [
+        {
+          key: key(),
+          status: "diff",
+          attemptedAt: new Date("2026-10-11T10:00:01.000Z"),
+          capturedAt: new Date("2026-10-11T10:00:02.000Z"),
+          diffRatio: 0.2,
+          masksApplied: [],
+        },
+        {
+          key: key({ page: "news" }),
+          status: "unchanged",
+          attemptedAt: new Date("2026-10-11T10:00:03.000Z"),
+          capturedAt: new Date("2026-10-11T10:00:04.000Z"),
+          diffRatio: 0,
+          masksApplied: [],
+        },
+      ],
+      summary: {
+        pages: 2,
+        total: 2,
+        unchanged: 1,
+        diffs: 1,
+        newBaselines: 0,
+        skipped: 0,
+        errors: 0,
+      },
+    };
+    const filtered: RunResult = {
+      startedAt: new Date("2026-10-11T11:00:00.000Z"),
+      results: [
+        {
+          key: key(),
+          status: "error",
+          attemptedAt: new Date("2026-10-11T11:00:01.000Z"),
+          masksApplied: [],
+          error: "Сеть недоступна",
+        },
+      ],
+      summary: {
+        pages: 1,
+        total: 1,
+        unchanged: 0,
+        diffs: 0,
+        newBaselines: 0,
+        skipped: 0,
+        errors: 1,
+      },
+    };
+
+    await storage.saveRunResult(first);
+    await storage.saveRunResult(filtered);
+
+    expect(await storage.listSnapshotStates()).toEqual([filtered.results[0], first.results[1]]);
+    expect((await storage.getLastRunResult())?.results).toEqual(filtered.results);
+  });
+
   it("round-trip: warnings сохраняются в sidecar вместе с masksApplied", async () => {
     const storage = createFileStorage(root);
     const snapshot = makeSnapshot(
