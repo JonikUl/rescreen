@@ -1,6 +1,7 @@
 import { ElementNotFoundError } from "../capture/types.js";
 import { DimensionMismatchError } from "../diff/types.js";
 import { resolveConfig } from "../config/loader.js";
+import { configuredSnapshotsForPages } from "../config/snapshot-keys.js";
 import type { Capture, CaptureTarget } from "../capture/types.js";
 import type { RescreenConfig, ResolvedPageConfig } from "../config/types.js";
 import type { DiffEngine } from "../diff/types.js";
@@ -41,20 +42,13 @@ export function createRunner(deps: RunnerDeps): Runner {
       const startedAt = new Date();
       const results: SnapshotResult[] = [];
 
-      for (const page of pages) {
-        const mask = [...resolved.mask, ...page.mask];
-        const url = `${resolved.baseUrl}${page.path}`;
-        const targets: CaptureTarget[] = [
-          { key: { page: page.name, viewport: page.viewport }, url, mask },
-          ...page.elements.map((selector): CaptureTarget => ({
-            key: { page: page.name, viewport: page.viewport, element: selector },
-            url,
-            mask,
-          })),
-        ];
-        for (const target of targets) {
-          results.push(await processTarget(target, page));
-        }
+      for (const { key, page } of configuredSnapshotsForPages(pages)) {
+        const target: CaptureTarget = {
+          key,
+          url: `${resolved.baseUrl}${page.path}`,
+          mask: [...resolved.mask, ...page.mask],
+        };
+        results.push(await processTarget(target, page));
       }
 
       const count = (status: SnapshotResult["status"]) =>
