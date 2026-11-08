@@ -8,7 +8,7 @@ export interface ApproverDeps {
 
 /**
  * Реализация {@link Approver}: workflow команды `rescreen approve` поверх BaselineStorage.
- * Кандидаты — ключи с Diff-файлами ({@link BaselineStorage.listPendingDiffs}, ADR-0003):
+ * Кандидаты — ключи с Diff-файлами ({@link BaselineStorage.listUnapprovedDiffs}, ADR-0003):
  * ни результат последнего Run'а, ни конфиг не читаются.
  */
 export function createApprover(deps: ApproverDeps): Approver {
