@@ -128,6 +128,17 @@ export function createFileStorage(rootDir?: string): FileBaselineStorage {
     await writeFile(metaPath(file), JSON.stringify(meta));
   };
 
+  const listSnapshotKeys = async (dir: string): Promise<SnapshotKey[]> => {
+    let files: string[];
+    try {
+      files = await readdir(dir);
+    } catch (err) {
+      if (isNotFound(err)) return [];
+      throw err;
+    }
+    return files.map(filenameToKey).filter((k): k is SnapshotKey => k !== null);
+  };
+
   return {
     rootDir: root,
 
@@ -210,6 +221,38 @@ export function createFileStorage(rootDir?: string): FileBaselineStorage {
 
     listSnapshotStates() {
       return readSnapshotStates(join(root, "state.json"));
+    },
+
+    async pruneSnapshots(keepKeys, options) {
+      const statePath = join(root, "state.json");
+      const states = await readSnapshotStates(statePath);
+      const keys = new Map(states.map((state) => [snapshotKeyId(state.key), state.key]));
+      for (const dir of [dirBaselines, dirCurrent, dirDiffs]) {
+        for (const key of await listSnapshotKeys(dir)) {
+          keys.set(snapshotKeyId(key), key);
+        }
+      }
+
+      const keep = new Set(keepKeys.map(snapshotKeyId));
+      const stale = [...keys.values()]
+        .filter((key) => !keep.has(snapshotKeyId(key)))
+        .sort((a, b) => snapshotKeyId(a).localeCompare(snapshotKeyId(b)));
+      if (options?.dryRun === true) return stale;
+      const staleIds = new Set(stale.map(snapshotKeyId));
+      for (const key of stale) {
+        const filename = keyToFilename(key);
+        await rm(join(dirBaselines, filename), { force: true });
+        await rm(metaPath(join(dirBaselines, filename)), { force: true });
+        await rm(join(dirCurrent, filename), { force: true });
+        await rm(metaPath(join(dirCurrent, filename)), { force: true });
+        await rm(join(dirDiffs, filename), { force: true });
+      }
+
+      const remaining = states.filter((state) => !staleIds.has(snapshotKeyId(state.key)));
+      if (remaining.length !== states.length) {
+        await writeFile(statePath, JSON.stringify(remaining.map(serializeSnapshotResult), null, 2));
+      }
+      return stale;
     },
 
     async getLastRunResult() {

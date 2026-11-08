@@ -96,6 +96,17 @@ export interface BaselineStorage {
   listSnapshotStates(): Promise<readonly SnapshotResult[]>;
 
   /**
+   * Находит per-key артефакты, чьи ключи отсутствуют в `keepKeys`, и удаляет их,
+   * если не включён `dryRun`: Baseline, current Snapshot, Diff и per-key состояние.
+   * Возвращает отсортированный список найденных устаревших ключей в обоих режимах.
+   * Инвариант: `dryRun` — чистое чтение; `last-run.json`, Report и Audit Log не изменяются.
+   */
+  pruneSnapshots(
+    keepKeys: readonly SnapshotKey[],
+    options?: { readonly dryRun?: boolean },
+  ): Promise<readonly SnapshotKey[]>;
+
+  /**
    * Возвращает текущий Snapshot последнего Run'а по ключу или null.
    * Инвариант: чистое чтение — не создаёт и не изменяет данные.
    */

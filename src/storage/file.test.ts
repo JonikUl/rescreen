@@ -378,6 +378,7 @@ describe("BaselineStorage (файловая реализация)", () => {
     const audit = await readFile(join(root, "audit.jsonl"), "utf8");
     expect(audit.trim().split("\n").filter(Boolean)).toHaveLength(1);
   });
+
   it("approve переводит актуальный Diff состояния в unchanged и сохраняет даты", async () => {
     const storage = createFileStorage(root);
     const k = key();
@@ -477,6 +478,85 @@ describe("BaselineStorage (файловая реализация)", () => {
     const loaded = await storage.getBaseline(key());
     expect(loaded).not.toBeNull();
     expect(loaded?.masksApplied).toEqual([]);
+  });
+
+  it("pruneSnapshots удаляет Baseline/current/Diff/state сироты и сохраняет last-run", async () => {
+    const storage = createFileStorage(root);
+    const keep = key();
+    const stale = key({ page: "removed", element: ".old" });
+    const png = encodePng(createPng(1, 1));
+    for (const k of [keep, stale]) {
+      await storage.saveBaseline(makeSnapshot(k, png));
+      await storage.saveCurrent(makeSnapshot(k, png));
+      await storage.saveDiff(k, png);
+    }
+    await storage.saveRunResult({
+      startedAt: new Date("2026-10-11T10:00:00.000Z"),
+      results: [keep, stale].map((k, index) => ({
+        key: k,
+        status: "unchanged" as const,
+        attemptedAt: new Date(`2026-10-11T10:00:0${index + 1}.000Z`),
+        capturedAt: new Date(`2026-10-11T10:00:0${index + 3}.000Z`),
+        diffRatio: 0,
+        masksApplied: [],
+      })),
+      summary: {
+        pages: 2,
+        total: 2,
+        unchanged: 2,
+        diffs: 0,
+        newBaselines: 0,
+        skipped: 0,
+        errors: 0,
+      },
+    });
+
+    const pruned = await storage.pruneSnapshots([keep]);
+
+    expect(pruned).toEqual([stale]);
+    expect(await storage.getBaseline(stale)).toBeNull();
+    expect(await storage.getCurrent(stale)).toBeNull();
+    expect(await storage.getDiff(stale)).toBeNull();
+    expect((await storage.listSnapshotStates()).map((state) => state.key)).toEqual([keep]);
+    expect(await storage.getBaseline(keep)).not.toBeNull();
+    expect(await storage.getCurrent(keep)).not.toBeNull();
+    expect(await storage.getDiff(keep)).not.toBeNull();
+    expect((await storage.getLastRunResult())?.results).toHaveLength(2);
+  });
+
+  it("pruneSnapshots --dry-run возвращает сирот, но не изменяет хранилище", async () => {
+    const storage = createFileStorage(root);
+    const keep = key({ page: "keep" });
+    const stale = key({ page: "removed" });
+    await storage.saveBaseline(makeSnapshot(stale, encodePng(createPng(1, 1))));
+    await storage.saveRunResult({
+      startedAt: new Date("2026-10-11T10:00:00.000Z"),
+      results: [
+        {
+          key: stale,
+          status: "unchanged",
+          attemptedAt: new Date("2026-10-11T10:00:01.000Z"),
+          capturedAt: new Date("2026-10-11T10:00:02.000Z"),
+          diffRatio: 0,
+          masksApplied: [],
+        },
+      ],
+      summary: {
+        pages: 1,
+        total: 1,
+        unchanged: 1,
+        diffs: 0,
+        newBaselines: 0,
+        skipped: 0,
+        errors: 0,
+      },
+    });
+
+    const preview = await storage.pruneSnapshots([keep], { dryRun: true });
+
+    expect(preview).toEqual([stale]);
+    expect(await storage.getBaseline(stale)).not.toBeNull();
+    expect((await storage.listSnapshotStates()).map((state) => state.key)).toEqual([stale]);
   });
 
   it("property: round-trip для любых допустимых ключей (fast-check)", async () => {
