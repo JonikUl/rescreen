@@ -30,3 +30,5 @@ If the concept you need isn't in the glossary yet, that's a signal — either yo
 If your output contradicts an existing ADR, surface it explicitly rather than silently overriding:
 
 > _Contradicts ADR-NNNN — but worth reopening because…_
+
+When a change that reverses an ADR decision lands, the same change amends that ADR or adds a new superseding one — the ADR set never silently disagrees with the code.
