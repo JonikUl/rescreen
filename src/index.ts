@@ -44,4 +44,6 @@ export { openReport, reportPathFor } from "./report/open.js";
 export type { OpenReportDeps, OpenReportResult } from "./report/open.js";
 export { getStatusBoard } from "./status/status.js";
 export type { StatusBoardDeps, StatusEntry } from "./status/status.js";
+export { pruneOrphans } from "./prune/prune.js";
+export type { PruneOrphansDeps } from "./prune/prune.js";
 export { formatSummaryLine, pluralize } from "./text/plural.js";

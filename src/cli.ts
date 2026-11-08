@@ -11,6 +11,7 @@ import { toExitCode } from "./runner/exit-code.js";
 import { createApprover } from "./approve/approve.js";
 import { createHtmlReporter } from "./report/html.js";
 import { openReport, reportPathFor } from "./report/open.js";
+import { pruneOrphans } from "./prune/prune.js";
 import { getStatusBoard } from "./status/status.js";
 import type { StatusEntry } from "./status/status.js";
 import { formatSummaryLine } from "./text/plural.js";
@@ -27,6 +28,8 @@ const USAGE = `rescreen — визуальное регрессионное те
                               текущие Snapshot'ы становятся Baseline'ами
                               (без аргументов — все неподтверждённые)
   rescreen status             показать актуальное состояние всех Page из конфига
+  rescreen prune [--dry-run]  удалить per-key артефакты, которых нет в конфиге
+                              (--dry-run — только показать устаревшие ключи)
   rescreen open               открыть последний Report в браузере`;
 
 async function run(pageNames: readonly string[]): Promise<number> {
@@ -167,6 +170,41 @@ function describeStatusEntry(entry: StatusEntry): string {
   }
 }
 
+async function prune(args: readonly string[]): Promise<number> {
+  const unknown = args.filter((arg) => arg !== "--dry-run");
+  if (unknown.length > 0) {
+    console.error(`Неизвестные аргументы prune: ${unknown.join(", ")}`);
+    return 2;
+  }
+  const dryRun = args.includes("--dry-run");
+  try {
+    const config = await loadConfig(process.cwd());
+    const storage = createFileStorage();
+    const keys = await pruneOrphans({ config, storage, dryRun });
+    if (keys.length === 0) {
+      console.log("rescreen: устаревших Snapshot'ов нет — нечего удалять.");
+      return 0;
+    }
+    console.log(
+      dryRun
+        ? "rescreen: устаревшие Snapshot'ы (предпросмотр, ничего не удалено):"
+        : "rescreen: удалены устаревшие Snapshot'ы:",
+    );
+    for (const key of keys) {
+      console.log(`  ${describeKey(key)}`);
+    }
+    if (dryRun) console.log("Для удаления выполните: rescreen prune");
+    return 0;
+  } catch (err) {
+    if (err instanceof ConfigError) {
+      console.error(`Ошибка конфигурации: ${err.message}`);
+    } else {
+      console.error(`Ошибка: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    return 2;
+  }
+}
+
 function printSummary(result: RunResult, reportPath: string): void {
   console.log("rescreen: прогон завершён");
   console.log(formatSummaryLine(result.summary));
@@ -219,6 +257,9 @@ async function main(): Promise<number> {
   }
   if (command === "status") {
     return status();
+  }
+  if (command === "prune") {
+    return prune(rest);
   }
   if (command === "open") {
     return open();
