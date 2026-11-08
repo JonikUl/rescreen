@@ -47,8 +47,20 @@ describe("Reporter (HTML)", () => {
     const result: RunResult = {
       startedAt: new Date("2026-10-11T10:00:00.000Z"),
       results: [
-        { key: homeKey, status: "diff", diffRatio: 0.25, masksApplied: [".cookie-banner"] },
-        { key: aboutKey, status: "unchanged", diffRatio: 0, masksApplied: [] },
+        {
+          key: homeKey,
+          attemptedAt: new Date(),
+          status: "diff",
+          diffRatio: 0.25,
+          masksApplied: [".cookie-banner"],
+        },
+        {
+          key: aboutKey,
+          attemptedAt: new Date(),
+          status: "unchanged",
+          diffRatio: 0,
+          masksApplied: [],
+        },
       ],
       summary: {
         pages: 2,
@@ -82,6 +94,7 @@ describe("Reporter (HTML)", () => {
       results: statuses.map((status, i) => ({
         key: { page: `page-${status}`, viewport: { width: 1440, height: 900 } },
         status,
+        attemptedAt: new Date(),
         masksApplied: [],
         ...(status === "error" ? { error: "Сеть недоступна" } : {}),
         ...(status === "skipped" ? { warning: "Элемент не найден" } : {}),
@@ -119,7 +132,15 @@ describe("Reporter (HTML)", () => {
     const storage = createFileStorage(join(root, ".rescreen"));
     const result: RunResult = {
       startedAt: new Date(),
-      results: [{ key: homeKey, status: "unchanged", diffRatio: 0, masksApplied: [] }],
+      results: [
+        {
+          key: homeKey,
+          attemptedAt: new Date(),
+          status: "unchanged",
+          diffRatio: 0,
+          masksApplied: [],
+        },
+      ],
       summary: {
         pages: 1,
         total: 1,
@@ -150,7 +171,15 @@ describe("Reporter (HTML)", () => {
     await storage.saveDiff(homeKey, encodePng(createPng(4, 4, { r: 255, g: 255, b: 0 })));
     const result: RunResult = {
       startedAt: new Date(),
-      results: [{ key: homeKey, status: "diff", diffRatio: 0.25, masksApplied: [] }],
+      results: [
+        {
+          key: homeKey,
+          attemptedAt: new Date(),
+          status: "diff",
+          diffRatio: 0.25,
+          masksApplied: [],
+        },
+      ],
       summary: {
         pages: 1,
         total: 1,
@@ -179,7 +208,9 @@ describe("Reporter (HTML)", () => {
     await storage.saveCurrent(makeSnapshot(homeKey, encodePng(createPng(4, 4))));
     const result: RunResult = {
       startedAt: new Date(),
-      results: [{ key: homeKey, status: "new-baseline", masksApplied: [] }],
+      results: [
+        { key: homeKey, attemptedAt: new Date(), status: "new-baseline", masksApplied: [] },
+      ],
       summary: {
         pages: 1,
         total: 1,
@@ -204,10 +235,17 @@ describe("Reporter (HTML)", () => {
     const result: RunResult = {
       startedAt: new Date(),
       results: [
-        { key: homeKey, status: "diff", diffRatio: 0.1, masksApplied: [] },
-        { key: aboutKey, status: "diff", diffRatio: 0.2, masksApplied: [] },
+        { key: homeKey, attemptedAt: new Date(), status: "diff", diffRatio: 0.1, masksApplied: [] },
+        {
+          key: aboutKey,
+          attemptedAt: new Date(),
+          status: "diff",
+          diffRatio: 0.2,
+          masksApplied: [],
+        },
         {
           key: { ...aboutKey, element: ".gone" },
+          attemptedAt: new Date(),
           status: "skipped",
           masksApplied: [],
           warning: "Элемент не найден",
@@ -236,9 +274,16 @@ describe("Reporter (HTML)", () => {
     const result: RunResult = {
       startedAt: new Date(),
       results: [
-        { key: homeKey, status: "unchanged", diffRatio: 0, masksApplied: [] },
+        {
+          key: homeKey,
+          attemptedAt: new Date(),
+          status: "unchanged",
+          diffRatio: 0,
+          masksApplied: [],
+        },
         {
           key: { ...homeKey, element: ".gone" },
+          attemptedAt: new Date(),
           status: "skipped",
           masksApplied: [],
           warning: "Элемент не найден",
@@ -272,10 +317,23 @@ describe("Reporter (HTML)", () => {
     const result: RunResult = {
       startedAt: new Date(),
       results: [
-        { key: homeKey, status: "diff", diffRatio: 0.25, masksApplied: [] },
-        { key: aboutKey, status: "unchanged", diffRatio: 0, masksApplied: [] },
+        {
+          key: homeKey,
+          attemptedAt: new Date(),
+          status: "diff",
+          diffRatio: 0.25,
+          masksApplied: [],
+        },
+        {
+          key: aboutKey,
+          attemptedAt: new Date(),
+          status: "unchanged",
+          diffRatio: 0,
+          masksApplied: [],
+        },
         {
           key: { ...aboutKey, element: ".missing" },
+          attemptedAt: new Date(),
           status: "skipped",
           masksApplied: [],
           warning: 'Element ".missing" не найден на странице "about"',
@@ -320,8 +378,20 @@ describe("Reporter (HTML)", () => {
     const result: RunResult = {
       startedAt: new Date(),
       results: [
-        { key: elementKey, status: "diff", diffRatio: 0.5, masksApplied: [] },
-        { key: homeKey, status: "unchanged", diffRatio: 0, masksApplied: [] },
+        {
+          key: elementKey,
+          attemptedAt: new Date(),
+          status: "diff",
+          diffRatio: 0.5,
+          masksApplied: [],
+        },
+        {
+          key: homeKey,
+          attemptedAt: new Date(),
+          status: "unchanged",
+          diffRatio: 0,
+          masksApplied: [],
+        },
       ],
       summary: {
         pages: 1,
@@ -350,7 +420,15 @@ describe("Reporter (HTML)", () => {
     const storage = createFileStorage(join(root, ".rescreen"));
     const result: RunResult = {
       startedAt: new Date(),
-      results: [{ key: homeKey, status: "error", masksApplied: [], error: "Сеть недоступна" }],
+      results: [
+        {
+          key: homeKey,
+          attemptedAt: new Date(),
+          status: "error",
+          masksApplied: [],
+          error: "Сеть недоступна",
+        },
+      ],
       summary: {
         pages: 1,
         total: 1,
@@ -374,8 +452,20 @@ describe("Reporter (HTML)", () => {
     const result: RunResult = {
       startedAt: new Date(),
       results: [
-        { key: homeKey, status: "unchanged", diffRatio: 0, masksApplied: [".cookie", "#chat"] },
-        { key: aboutKey, status: "unchanged", diffRatio: 0, masksApplied: [] },
+        {
+          key: homeKey,
+          attemptedAt: new Date(),
+          status: "unchanged",
+          diffRatio: 0,
+          masksApplied: [".cookie", "#chat"],
+        },
+        {
+          key: aboutKey,
+          attemptedAt: new Date(),
+          status: "unchanged",
+          diffRatio: 0,
+          masksApplied: [],
+        },
       ],
       summary: {
         pages: 2,
@@ -406,6 +496,7 @@ describe("Reporter (HTML)", () => {
       results: [
         {
           key: homeKey,
+          attemptedAt: new Date(),
           status: "unchanged",
           diffRatio: 0,
           masksApplied: [],

@@ -15,6 +15,10 @@ export type SnapshotStatus = "new-baseline" | "unchanged" | "diff" | "skipped" |
 export interface SnapshotResult {
   readonly key: SnapshotKey;
   readonly status: SnapshotStatus;
+  /** Момент начала обработки цели; есть у каждого результата, включая `error` и `skipped`. */
+  readonly attemptedAt: Date;
+  /** Момент съёмки; присутствует у `new-baseline`, `unchanged` и `diff`. */
+  readonly capturedAt?: Date;
   /** Доля отличающихся пикселей; присутствует при статусе `diff` и `unchanged`. */
   readonly diffRatio?: number;
   /**

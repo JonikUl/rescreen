@@ -144,6 +144,25 @@ describe("Runner (конвейер Run'а через фейковый Capture)",
     expect(toExitCode(result)).toBe(0);
   });
 
+  it("SnapshotResult содержит время попытки и фактическое capturedAt Snapshot'а", async () => {
+    const capture = new FakeCapture(
+      fixtures(["home", solid(255, 0, 0)], ["about", solid(0, 255, 0)]),
+    );
+    const { runner, storage } = await setupRunner(storageDir, reportPath, capture);
+
+    const result = await runner.run(["home"]);
+
+    const snapshotResult = result.results[0]!;
+    const current = await storage.getCurrent({
+      page: "home",
+      viewport: { width: 1440, height: 900 },
+    });
+    expect(current).not.toBeNull();
+    expect(snapshotResult.attemptedAt).toBeInstanceOf(Date);
+    expect(snapshotResult.capturedAt).toEqual(current?.capturedAt);
+    expect(snapshotResult.attemptedAt.getTime()).toBeLessThanOrEqual(current!.capturedAt.getTime());
+  });
+
   it("повторный Run на неизменных снимках: unchanged, exit-код 0", async () => {
     const capture = new FakeCapture(
       fixtures(["home", solid(255, 0, 0)], ["about", solid(0, 255, 0)]),

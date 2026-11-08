@@ -4,13 +4,36 @@ import { join, resolve } from "node:path";
 
 import type { AuditEntry, BaselineStorage } from "./types.js";
 import type { Snapshot, SnapshotKey } from "../snapshot/types.js";
-import type { RunResult } from "../runner/types.js";
+import type { RunResult, SnapshotResult } from "../runner/types.js";
 
 /** Файловая реализация {@link BaselineStorage}. */
 export type FileBaselineStorage = BaselineStorage & {
   /** Абсолютный путь к корню хранилища (например, `<cwd>/.rescreen`). */
   readonly rootDir: string;
 };
+
+type SerializedSnapshotResult = Omit<SnapshotResult, "attemptedAt" | "capturedAt"> & {
+  readonly attemptedAt: string;
+  readonly capturedAt?: string;
+};
+
+function serializeSnapshotResult(result: SnapshotResult): SerializedSnapshotResult {
+  const { attemptedAt, capturedAt, ...rest } = result;
+  return {
+    ...rest,
+    attemptedAt: attemptedAt.toISOString(),
+    ...(capturedAt === undefined ? {} : { capturedAt: capturedAt.toISOString() }),
+  };
+}
+
+function deserializeSnapshotResult(result: SerializedSnapshotResult): SnapshotResult {
+  const { attemptedAt, capturedAt, ...rest } = result;
+  return {
+    ...rest,
+    attemptedAt: new Date(attemptedAt),
+    ...(capturedAt === undefined ? {} : { capturedAt: new Date(capturedAt) }),
+  };
+}
 
 interface SnapshotMeta {
   readonly capturedAt: string;
@@ -140,7 +163,7 @@ export function createFileStorage(rootDir?: string): FileBaselineStorage {
       await mkdir(root, { recursive: true });
       const json = {
         startedAt: result.startedAt.toISOString(),
-        results: result.results,
+        results: result.results.map(serializeSnapshotResult),
         summary: result.summary,
       };
       await writeFile(join(root, "last-run.json"), JSON.stringify(json, null, 2));
@@ -154,8 +177,16 @@ export function createFileStorage(rootDir?: string): FileBaselineStorage {
         if (isNotFound(err)) return null;
         throw err;
       }
-      const parsed = JSON.parse(raw) as { startedAt: string } & Omit<RunResult, "startedAt">;
-      return { ...parsed, startedAt: new Date(parsed.startedAt) };
+      const parsed = JSON.parse(raw) as {
+        startedAt: string;
+        results: SerializedSnapshotResult[];
+        summary: RunResult["summary"];
+      };
+      return {
+        startedAt: new Date(parsed.startedAt),
+        results: parsed.results.map(deserializeSnapshotResult),
+        summary: parsed.summary,
+      };
     },
 
     getCurrent(key) {

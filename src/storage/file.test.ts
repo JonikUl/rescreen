@@ -120,8 +120,22 @@ describe("BaselineStorage (файловая реализация)", () => {
     const result: RunResult = {
       startedAt: new Date("2026-10-11T10:00:00.000Z"),
       results: [
-        { key: key(), status: "unchanged", diffRatio: 0, masksApplied: [".cookie"] },
-        { key: key({ page: "news" }), status: "diff", diffRatio: 0.42, masksApplied: [] },
+        {
+          key: key(),
+          status: "unchanged",
+          attemptedAt: new Date("2026-10-11T10:00:01.000Z"),
+          capturedAt: new Date("2026-10-11T10:00:02.000Z"),
+          diffRatio: 0,
+          masksApplied: [".cookie"],
+        },
+        {
+          key: key({ page: "news" }),
+          status: "diff",
+          attemptedAt: new Date("2026-10-11T10:00:03.000Z"),
+          capturedAt: new Date("2026-10-11T10:00:04.000Z"),
+          diffRatio: 0.42,
+          masksApplied: [],
+        },
       ],
       summary: {
         pages: 2,

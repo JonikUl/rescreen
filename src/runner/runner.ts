@@ -78,6 +78,7 @@ export function createRunner(deps: RunnerDeps): Runner {
     page: ResolvedPageConfig,
   ): Promise<SnapshotResult> {
     const key = target.key;
+    const attemptedAt = new Date();
     try {
       const snapshot: Snapshot = await deps.capture.capture(target);
       await deps.storage.saveCurrent(snapshot);
@@ -86,7 +87,14 @@ export function createRunner(deps: RunnerDeps): Runner {
       const baseline = await deps.storage.getBaseline(key);
       if (!baseline) {
         await deps.storage.saveBaseline(snapshot);
-        return { key, status: "new-baseline", masksApplied: snapshot.masksApplied, warning };
+        return {
+          key,
+          status: "new-baseline",
+          attemptedAt,
+          capturedAt: snapshot.capturedAt,
+          masksApplied: snapshot.masksApplied,
+          warning,
+        };
       }
 
       const diff = await deps.diffEngine.compare(baseline.png, snapshot.png);
@@ -95,6 +103,8 @@ export function createRunner(deps: RunnerDeps): Runner {
         return {
           key,
           status: "diff",
+          attemptedAt,
+          capturedAt: snapshot.capturedAt,
           diffRatio: diff.ratio,
           masksApplied: snapshot.masksApplied,
           warning,
@@ -106,6 +116,8 @@ export function createRunner(deps: RunnerDeps): Runner {
       return {
         key,
         status: "unchanged",
+        attemptedAt,
+        capturedAt: snapshot.capturedAt,
         diffRatio: diff.ratio,
         masksApplied: snapshot.masksApplied,
         warning,
@@ -115,6 +127,7 @@ export function createRunner(deps: RunnerDeps): Runner {
         return {
           key,
           status: "error",
+          attemptedAt,
           masksApplied: target.mask,
           error: `${err.message} (доработка поведения — позже)`,
         };
@@ -123,6 +136,7 @@ export function createRunner(deps: RunnerDeps): Runner {
         return {
           key,
           status: "skipped",
+          attemptedAt,
           masksApplied: target.mask,
           warning: err.message,
         };
@@ -130,6 +144,7 @@ export function createRunner(deps: RunnerDeps): Runner {
       return {
         key,
         status: "error",
+        attemptedAt,
         masksApplied: target.mask,
         error: err instanceof Error ? err.message : String(err),
       };
